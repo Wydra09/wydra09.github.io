@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moje Aplikacje Webowe</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f1f2f6;
+            color: #2f3542;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        h1 { color: #1e272e; text-align: center; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #747d8c; margin-bottom: 40px; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.2s ease;
+            border: 1px solid #e4e7eb;
+            display: flex;
+            flex-direction: column;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            border-left: 5px solid #ff4757;
+        }
+        /* Specjalny kolor paska przy najechaniu na konkretną kartę */
+        .card.garaz:hover { border-left-color: #2ed573; }
+        .card.bomber:hover { border-left-color: #ffa502; }
+
+        .card h2 { margin: 0 0 10px 0; font-size: 20px; }
+        .card p { margin: 0; font-size: 14px; color: #57606f; line-height: 1.5; }
+        .tag {
+            align-self: flex-start;
+            margin-top: auto;
+            padding: 4px 8px;
+            background: #f1f2f6;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #747d8c;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Moje Portfolio Aplikacji Webowych</h1>
+    <div class="subtitle">Kolekcja projektów stworzonych wspólnie z AI</div>
+
+    <div class="grid">
+        
+        <!-- KARTA: SYMULATOR GARAŻU -->
+        <a href="symulator-garazu/" class="card garaz">
+            <h2>🚗 Symulator wjazdu do garażu</h2>
+            <p>Interaktywne narzędzie do sprawdzania geometrii podjazdu o długości 305 cm. Wykrywa kolizje podwozia w czasie rzeczywistym.</p>
+            <div class="tag" style="margin-top: 15px;">Narzędzie / Canvas</div>
+        </a>
+
+        <!-- KARTA: BOMBERMAN -->
+        <a href="Bomberman/" class="card bomber">
+            <h2>💣 Klasyczny Bomberman</h2>
+            <p>Zręcznościowa gra retro przeniesiona do przeglądarki. Podkładaj bomby, niszcz przeszkody i unikaj eksplozji!</p>
+            <div class="tag" style="margin-top: 15px;">Gra / JS</div>
+        </a>
+
+    </div>
+
+</body>
+</html>

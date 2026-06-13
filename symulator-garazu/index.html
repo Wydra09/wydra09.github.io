@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symulator wjazdu do garazu</title>
+    <style>
+        html, body {
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f1f2f6;
+        }
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            box-sizing: border-box;
+            gap: 10px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 0;
+            text-align: center;
+            color: #1e272e;
+            border-bottom: 2px solid #e4e7eb;
+            padding-bottom: 4px;
+        }
+        #canvasContainer {
+            flex: 1;
+            min-height: 0; 
+            width: 100%;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #ffffff;
+            border: 1px solid #ced6e0;
+            border-radius: 8px;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+        .control-group {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #e4e7eb;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            justify-content: center;
+        }
+        .slider-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        label {
+            font-weight: bold;
+            font-size: 11px;
+            color: #57606f;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 2px 0;
+            cursor: pointer;
+        }
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .val-input {
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: bold;
+            color: #2ed573;
+            background: #e3fcef;
+            border: 1px solid #2ed573;
+            padding: 2px 4px;
+            border-radius: 4px;
+            width: 52px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        .val-input::-webkit-outer-spin-button,
+        .val-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .val-input[type=number] {
+            -moz-appearance: textfield;
+        }
+        .val-display {
+            font-size: 10px;
+            font-weight: bold;
+            color: #57606f;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: bold;
+            font-size: 10px;
+            color: #2f3542;
+            cursor: pointer;
+            background: #f1f2f6;
+            padding: 4px;
+            border-radius: 6px;
+            margin-top: 2px;
+        }
+        .checkbox-item input {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+        }
+        .bottom-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            height: 40px;
+        }
+        .status {
+            font-size: 13px;
+            font-weight: bold;
+            padding: 8px;
+            border-radius: 6px;
+            text-align: center;
+            flex: 1;
+            white-space: nowrap;
+        }
+        .status.ok {
+            background: #e3fcef;
+            color: #2ed573;
+            border: 1px solid #2ed573;
+        }
+        .status.collision {
+            background: #ffe0e6;
+            color: #ff4757;
+            border: 1px solid #ff4757;
+        }
+        .info-panel {
+            font-size: 11px;
+            color: #747d8c;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #ced6e0;
+            flex: 2;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Symulator Podjazdu - Linie Pomocnicze</h2>
+    
+    <div id="canvasContainer">
+        <canvas id="simCanvas"></canvas>
+    </div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <div class="slider-item">
+                <label for="carSlider">Pozycja pojazdu (przód):</label>
+                <input type="range" id="carSlider" min="310" max="850" value="310" step="1">
+                <div class="input-row">
+                    <input type="number" id="carNum" min="310" max="850" value="310" step="1" class="val-input">
+                    <span class="val-display" id="carVal">cm</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="control-group" style="border-left: 3px solid #54a0ff;">
+            <div class="slider-item">
+                <label for="bumpASlider">Pozycja Progu A:</label>
+                <input type="range" id="bumpASlider" min="-200" max="550" value="-80" step="1">
+                <div class="input-row">
+                    <input type="number" id="bumpANum" min="-200" max="550" value="-80" step="1" class="val-input">
+                    <span class="val-display" id="bumpAVal">cm</span>
+                </div>
+            </div>
+            <div class="slider-item">
+                <label for="bumpAHeightSlider">Wysokość Progu A:</label>
+                <input type="range" id="bumpAHeightSlider" min="0" max="20" value="6" step="0.5">
+                <div class="input-row">
+                    <input type="number" id="bumpAHeightNum" min="0" max="20" value="6" step="0.5" class="val-input">
+                    <span class="val-display" id="bumpAHeightVal">cm</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="control-group" style="border-left: 3px solid #54a0ff;">
+            <div class="slider-item">
+                <label for="bumpBSlider">Pozycja Progu B:</label>
+                <input type="range" id="bumpBSlider" min="-200" max="550" value="-30" step="1">
+                <div class="input-row">
+                    <input type="number" id="bumpBNum" min="-200" max="550" value="-30" step="1" class="val-input">
+                    <span class="val-display" id="bumpBVal">cm</span>
+                </div>
+            </div>
+            <div class="slider-item">
+                <label for="bumpBHeightSlider">Wysokość Progu B:</label>
+                <input type="range" id="bumpBHeightSlider" min="0" max="20" value="8" step="0.5">
+                <div class="input-row">
+                    <input type="number" id="bumpBHeightNum" min="0" max="20" value="8" step="0.5" class="val-input">
+                    <span class="val-display" id="bumpBHeightVal">cm</span>
+                </div>
+            </div>
+            <label class="checkbox-item">
+                <input type="checkbox" id="rampABCheck">
+                Połącz A-B w rampę
+            </label>
+        </div>
+
+        <div class="control-group" style="border-left: 3px solid #ff9f43;">
+            <div class="slider-item">
+                <label for="bumpCSlider">Pozycja Progu C:</label>
+                <input type="range" id="bumpCSlider" min="0" max="550" value="80" step="1">
+                <div class="input-row">
+                    <input type="number" id="bumpCNum" min="0" max="550" value="80" step="1" class="val-input">
+                    <span class="val-display" id="bumpCVal">cm</span>
+                </div>
+            </div>
+            <div class="slider-item">
+                <label for="bumpCHeightSlider">Wysokość Progu C:</label>
+                <input type="range" id="bumpCHeightSlider" min="0" max="20" value="8" step="0.5">
+                <div class="input-row">
+                    <input type="number" id="bumpCHeightNum" min="0" max="20" value="8" step="0.5" class="val-input">
+                    <span class="val-display" id="bumpCHeightVal">cm</span>
+                </div>
+            </div>
+            <label class="checkbox-item">
+                <input type="checkbox" id="rampBCCheck">
+                Połącz B-C w rampę
+            </label>
+        </div>
+
+        <div class="control-group" style="border-left: 3px solid #ff9f43;">
+            <div class="slider-item">
+                <label for="bumpDSlider">Pozycja Progu D:</label>
+                <input type="range" id="bumpDSlider" min="0" max="550" value="180" step="1">
+                <div class="input-row">
+                    <input type="number" id="bumpDNum" min="0" max="550" value="180" step="1" class="val-input">
+                    <span class="val-display" id="bumpDVal">cm</span>
+                </div>
+            </div>
+            <div class="slider-item">
+                <label for="bumpDHeightSlider">Wysokość Progu D:</label>
+                <input type="range" id="bumpDHeightSlider" min="0" max="20" value="6" step="0.5">
+                <div class="input-row">
+                    <input type="number" id="bumpDHeightNum" min="0" max="20" value="6" step="0.5" class="val-input">
+                    <span class="val-display" id="bumpDHeightVal">cm</span>
+                </div>
+            </div>
+            <label class="checkbox-item">
+                <input type="checkbox" id="rampCDCheck">
+                Połącz C-D w rampę
+            </label>
+        </div>
+    </div>
+    
+    <div class="bottom-row">
+        <div id="statusBox" class="status ok">Status: OK</div>
+        <div class="info-panel">
+            Wartości możesz wpisywać bezpośrednio z klawiatury lub zmieniać suwakami. Na wykresie zaznaczono początek podjazdu oraz główny szczyt.
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Slidery
+    const carSlider = document.getElementById('carSlider');
+    const bumpASlider = document.getElementById('bumpASlider');
+    const bumpAHeightSlider = document.getElementById('bumpAHeightSlider');
+    const bumpBSlider = document.getElementById('bumpBSlider');
+    const bumpBHeightSlider = document.getElementById('bumpBHeightSlider');
+    const bumpCSlider = document.getElementById('bumpCSlider');
+    const bumpCHeightSlider = document.getElementById('bumpCHeightSlider');
+    const bumpDSlider = document.getElementById('bumpDSlider');
+    const bumpDHeightSlider = document.getElementById('bumpDHeightSlider');
+    
+    // Pola numeryczne
+    const carNum = document.getElementById('carNum');
+    const bumpANum = document.getElementById('bumpANum');
+    const bumpAHeightNum = document.getElementById('bumpAHeightNum');
+    const bumpBNum = document.getElementById('bumpBNum');
+    const bumpBHeightNum = document.getElementById('bumpBHeightNum');
+    const bumpCNum = document.getElementById('bumpCNum');
+    const bumpCHeightNum = document.getElementById('bumpCHeightNum');
+    const bumpDNum = document.getElementById('bumpDNum');
+    const bumpDHeightNum = document.getElementById('bumpDHeightNum');
+
+    // Checkboxy i status
+    const rampABCheck = document.getElementById('rampABCheck');
+    const rampBCCheck = document.getElementById('rampBCCheck');
+    const rampCDCheck = document.getElementById('rampCDCheck');
+    const statusBox = document.getElementById('statusBox');
+
+    // Suffixy tekstowe
+    const carVal = document.getElementById('carVal');
+    const bumpAVal = document.getElementById('bumpAVal');
+    const bumpAHeightVal = document.getElementById('bumpAHeightVal');
+    const bumpBVal = document.getElementById('bumpBVal');
+    const bumpBHeightVal = document.getElementById('bumpBHeightVal');
+    const bumpCVal = document.getElementById('bumpCVal');
+    const bumpCHeightVal = document.getElementById('bumpCHeightVal');
+    const bumpDVal = document.getElementById('bumpDVal');
+    const bumpDHeightVal = document.getElementById('bumpDHeightVal');
+
+    let SCALE, PAD_X, PAD_Y;
+    const START_SLOPE_X = 190;
+    const APEX_X = 300; 
+
+    function getBaseTerrainY(x) {
+        if (x < START_SLOPE_X) return 0; 
+        if (x < APEX_X) return (x - START_SLOPE_X) * (10 / 110); 
+        return 10 - (x - APEX_X) * (65 / 300); 
+    }
+
+    function getSingleBumpHeight(x, bumpCenter, maxH) {
+        let dist = Math.abs(x - bumpCenter);
+        if (dist < 15) return maxH * Math.cos((dist / 15) * Math.PI / 2);
+        return 0;
+    }
+
+    function formatLabelText(offset) {
+        if (offset < 0) return `cm (przed szczytem)`;
+        if (offset > 0) return `cm (za szczytem)`;
+        return `cm (na szczycie)`;
+    }
+
+    function getTerrainModifier(x) {
+        let pA = APEX_X + parseInt(bumpASlider.value);
+        let pB = APEX_X + parseInt(bumpBSlider.value);
+        let pC = APEX_X + parseInt(bumpCSlider.value);
+        let pD = APEX_X + parseInt(bumpDSlider.value);
+        
+        let hA = parseFloat(bumpAHeightSlider.value);
+        let hB = parseFloat(bumpBHeightSlider.value);
+        let hC = parseFloat(bumpCHeightSlider.value);
+        let hD = parseFloat(bumpDHeightSlider.value);
+
+        if (rampABCheck.checked && x >= Math.min(pA, pB) && x <= Math.max(pA, pB)) {
+            let pL = Math.min(pA, pB); let pR = Math.max(pA, pB);
+            if (pL === pR) return hA;
+            let hL = (pA === pL) ? hA : hB; let hR = (pA === pR) ? hA : hB;
+            return hL + (x - pL) / (pR - pL) * (hR - hL);
+        }
+        if (rampBCCheck.checked && x >= Math.min(pB, pC) && x <= Math.max(pB, pC)) {
+            let pL = Math.min(pB, pC); let pR = Math.max(pB, pC);
+            if (pL === pR) return hB;
+            let hL = (pB === pL) ? hB : hC; let hR = (pB === pR) ? hB : hC;
+            return hL + (x - pL) / (pR - pL) * (hR - hL);
+        }
+        if (rampCDCheck.checked && x >= Math.min(pC, pD) && x <= Math.max(pC, pD)) {
+            let pL = Math.min(pC, pD); let pR = Math.max(pC, pD);
+            if (pL === pR) return hC;
+            let hL = (pC === pL) ? hC : hD; let hR = (pC === pR) ? hC : hD;
+            return hL + (x - pL) / (pR - pL) * (hR - hL);
+        }
+
+        let totalTails = 0;
+        
+        let tailA = getSingleBumpHeight(x, pA, hA);
+        if (tailA > 0) {
+            let towardsB = (x > pA && pB > pA) || (x < pA && pB < pA);
+            if (rampABCheck.checked && towardsB) tailA = 0;
+            totalTails += tailA;
+        }
+
+        let tailB = getSingleBumpHeight(x, pB, hB);
+        if (tailB > 0) {
+            let towardsA = (x > pB && pA > pB) || (x < pB && pA < pB);
+            let towardsC = (x > pB && pC > pB) || (x < pB && pC < pB);
+            if (rampABCheck.checked && towardsA) tailB = 0;
+            if (rampBCCheck.checked && towardsC) tailB = 0;
+            totalTails += tailB;
+        }
+
+        let tailC = getSingleBumpHeight(x, pC, hC);
+        if (tailC > 0) {
+            let towardsB = (x > pC && pB > pC) || (x < pC && pB < pC);
+            let towardsD = (x > pC && pD > pC) || (x < pC && pD < pC);
+            if (rampBCCheck.checked && towardsB) tailC = 0;
+            if (rampCDCheck.checked && towardsD) tailC = 0;
+            totalTails += tailC;
+        }
+
+        let tailD = getSingleBumpHeight(x, pD, hD);
+        if (tailD > 0) {
+            let towardsC = (x > pD && pC > pD) || (x < pD && pC < pD);
+            if (rampCDCheck.checked && towardsC) tailD = 0;
+            totalTails += tailD;
+        }
+
+        return totalTails;
+    }
+
+    function getTerrainY(x) {
+        return getBaseTerrainY(x) + getTerrainModifier(x);
+    }
+
+    function cx(x) { return PAD_X + x * SCALE; }
+    function cy(y) { return PAD_Y - y * SCALE; }
+
+    function updateSimulation() {
+        let xF = parseFloat(carSlider.value);
+        let bAOffset = parseInt(bumpASlider.value);
+        let bBOffset = parseInt(bumpBSlider.value);
+        let bCOffset = parseInt(bumpCSlider.value);
+        let bDOffset = parseInt(bumpDSlider.value);
+
+        // Synchronizacja pól numerycznych
+        carNum.value = xF;
+        bumpANum.value = bAOffset;
+        bumpBNum.value = bBOffset;
+        bumpCNum.value = bCOffset;
+        bumpDNum.value = bDOffset;
+        
+        bumpAHeightNum.value = bumpAHeightSlider.value;
+        bumpBHeightNum.value = bumpBHeightSlider.value;
+        bumpCHeightNum.value = bumpCHeightSlider.value;
+        bumpDHeightNum.value = bumpDHeightSlider.value;
+
+        // Aktualizacja opisów
+        carVal.innerText = `cm (przód auta)`;
+        bumpAVal.innerText = formatLabelText(bAOffset);
+        bumpBVal.innerText = formatLabelText(bBOffset);
+        bumpCVal.innerText = formatLabelText(bCOffset);
+        bumpDVal.innerText = formatLabelText(bDOffset);
+        
+        bumpAHeightVal.innerText = `cm`;
+        bumpBHeightVal.innerText = `cm`;
+        bumpCHeightVal.innerText = `cm`;
+        bumpDHeightVal.innerText = `cm`;
+
+        let yF = getTerrainY(xF);
+        let xR = xF - 305;
+        for (let i = 0; i < 5; i++) {
+            let yR = getTerrainY(xR);
+            let dist = Math.sqrt(Math.pow(xF - xR, 2) + Math.pow(yF - yR, 2));
+            xR -= (305 - dist) * ((xF - xR) / dist);
+        }
+        let yR = getTerrainY(xR);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // RYSOWANIE TERENU
+        ctx.beginPath();
+        ctx.moveTo(cx(0), cy(-150));
+        for (let x = 0; x <= 900; x += 2) {
+            ctx.lineTo(cx(x), cy(getTerrainY(x)));
+        }
+        ctx.lineTo(cx(900), cy(-150));
+        ctx.closePath();
+        ctx.fillStyle = "#ced6e0";
+        ctx.fill();
+        ctx.strokeStyle = "#747d8c";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // LINIE POMOCNICZE
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = "#747d8c";
+        ctx.lineWidth = 1.5;
+        ctx.font = "10px sans-serif";
+        ctx.fillStyle = "#57606f";
+
+        // Linia początku podjazdu (bez 190cm)
+        ctx.beginPath(); ctx.moveTo(cx(START_SLOPE_X), cy(-100)); ctx.lineTo(cx(START_SLOPE_X), cy(50)); ctx.stroke();
+        ctx.fillText("Początek podjazdu", cx(START_SLOPE_X) + 5, cy(40));
+
+        // Linia szczytu
+        ctx.beginPath(); ctx.moveTo(cx(APEX_X), cy(-100)); ctx.lineTo(cx(APEX_X), cy(50)); ctx.stroke();
+        ctx.fillText("Szczyt / Punkt 0 cm", cx(APEX_X) + 5, cy(40));
+        
+        ctx.setLineDash([]); 
+
+        let dx = xF - xR; let dy = yF - yR;
+        let len = Math.sqrt(dx*dx + dy*dy);
+        let nx = -dy / len; let ny = dx / len;
+
+        let clearH = 15;
+        let chassisXR = xR + clearH * nx; let chassisYR = yR + clearH * ny;
+        let chassisXF = xF + clearH * nx; let chassisYF = yF + clearH * ny;
+
+        let collision = false;
+        let scrapeX = [];
+
+        for (let x = xR; x <= xF; x += 1) {
+            let t = (x - xR) / (xF - xR);
+            let carUnderbodyY = chassisYR + t * (chassisYF - chassisYR);
+            let groundY = getTerrainY(x);
+            if (groundY >= carUnderbodyY) {
+                collision = true;
+                scrapeX.push(x);
+            }
+        }
+
+        ctx.fillStyle = "#2f3542";
+        ctx.beginPath(); ctx.arc(cx(xR), cy(yR), Math.max(3, 12 * SCALE), 0, 2 * Math.PI); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx(xF), cy(yF), Math.max(3, 12 * SCALE), 0, 2 * Math.PI); ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(cx(chassisXR), cy(chassisYR));
+        ctx.lineTo(cx(chassisXF), cy(chassisYF));
+        ctx.lineTo(cx(chassisXF + 25 * nx), cy(chassisYF + 25 * ny));
+        ctx.lineTo(cx(chassisXR + 25 * nx), cy(chassisYR + 25 * ny));
+        ctx.closePath();
+        
+        if (collision) {
+            ctx.fillStyle = "rgba(255, 71, 87, 0.65)";
+            statusBox.innerText = "⚠️ KOLIZJA! Podwozie szoruje po profilu!";
+            statusBox.className = "status collision";
+        } else {
+            ctx.fillStyle = "rgba(84, 160, 255, 0.65)";
+            statusBox.innerText = "Status: OK (Czysty przejazd)";
+            statusBox.className = "status ok";
+        }
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(cx(chassisXR), cy(chassisYR));
+        ctx.lineTo(cx(chassisXF), cy(chassisYF));
+        ctx.strokeStyle = collision ? "#ff4757" : "#2ed573";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        if (collision && scrapeX.length > 0) {
+            ctx.beginPath();
+            ctx.strokeStyle = "#ff4757";
+            ctx.lineWidth = 4;
+            ctx.moveTo(cx(scrapeX[0]), cy(getTerrainY(scrapeX[0])));
+            for(let j=1; j<scrapeX.length; j++) {
+                ctx.lineTo(cx(scrapeX[j]), cy(getTerrainY(scrapeX[j])));
+            }
+            ctx.stroke();
+
+            ctx.fillStyle = "#ff1744";
+            for (let k = 0; k < scrapeX.length; k += Math.max(1, Math.round(5 / SCALE))) {
+                let pX = scrapeX[k];
+                let pY = getTerrainY(pX);
+                ctx.beginPath(); ctx.arc(cx(pX), cy(pY), 5, 0, 2 * Math.PI); ctx.fill();
+                ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1; ctx.stroke();
+            }
+        }
+    }
+
+    function resizeCanvas() {
+        const container = document.getElementById('canvasContainer');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        
+        SCALE = (canvas.width - 50) / 900; 
+        PAD_X = 25;
+        PAD_Y = canvas.height * 0.52; 
+        
+        updateSimulation();
+    }
+
+    function linkControls(slider, numInput) {
+        slider.addEventListener('input', () => {
+            numInput.value = slider.value;
+            updateSimulation();
+        });
+        numInput.addEventListener('input', () => {
+            if (numInput.value !== '') {
+                slider.value = numInput.value;
+                updateSimulation();
+            }
+        });
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    
+    linkControls(carSlider, carNum);
+    linkControls(bumpASlider, bumpANum);
+    linkControls(bumpAHeightSlider, bumpAHeightNum);
+    linkControls(bumpBSlider, bumpBNum);
+    linkControls(bumpBHeightSlider, bumpBHeightNum);
+    linkControls(bumpCSlider, bumpCNum);
+    linkControls(bumpCHeightSlider, bumpCHeightNum);
+    linkControls(bumpDSlider, bumpDNum);
+    linkControls(bumpDHeightSlider, bumpDHeightNum);
+
+    rampABCheck.addEventListener('change', updateSimulation);
+    rampBCCheck.addEventListener('change', updateSimulation);
+    rampCDCheck.addEventListener('change', updateSimulation);
+
+    resizeCanvas();
+</script>
+</body>
+</html>
