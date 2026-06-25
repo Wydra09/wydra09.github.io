@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>BOMBERMAN 9</title>
+    <style>
+        body {
+            background-color: #222;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        h1 { color: #ff4500; margin: 0 0 10px 0; font-size: 24px; }
+        #menu, #game-container {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        #game-container {
+            display: none;
+            padding: 10px;
+            max-width: 98vw;
+            max-height: 90vh;
+        }
+        .menu-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 460px;
+            border: 2px solid transparent;
+            box-sizing: border-box;
+        }
+        .menu-item.active {
+            border-color: #ff4500;
+            background-color: #555;
+            box-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
+        }
+        .menu-label { font-weight: bold; }
+        .menu-value { color: #00ff00; font-weight: bold; background: #222; padding: 4px 10px; border-radius: 4px; min-width: 180px; text-align: center;}
+        #start-btn {
+            background-color: #28a745; color: white; font-weight: bold; margin-top: 15px; width: 100%;
+            padding: 12px; border-radius: 5px; border: none; font-size: 16px;
+        }
+        #start-btn.active {
+            outline: 3px solid #ff4500;
+            background-color: #218838;
+        }
+        
+        canvas {
+            border: 4px solid #555;
+            background-color: #329632;
+            display: block;
+            width: 92vw;
+            height: 80vh;
+            max-width: 1200px;
+            max-height: 950px;
+            object-fit: contain;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>BOMBERMAN 9</h1>
+
+    <div id="menu">
+        <div class="menu-item active" id="item-count" data-type="count">
+            <span class="menu-label">Liczba Graczy:</span>
+            <span class="menu-value" id="val-count">4 Graczy</span>
+        </div>
+
+        <div id="players-config-list"></div>
+
+        <button id="start-btn" onclick="startGame()">URUCHOM GRĘ (ENTER / PRZYCISK A)</button>
+    </div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="675" height="585" tabindex="0" style="outline: none;"></canvas>
+    </div>
+
+<script>
+const TILE_SIZE = 45;
+const GRID_WIDTH = 15;
+const GRID_HEIGHT = 13;
+
+const COLOR_WALL = "#646464";
+const COLOR_CRATE = "#8B4513";
+const COLOR_FLOOR = "#329632";
+const COLOR_FLOOR_GRID = "#288228";
+const COLOR_BOMB = "#1E1E1E";
+const COLOR_EXPLOSION = "#FF4500";
+
+const PLAYER_COLORS = ["#FF0000", "#1E90FF", "#FFFF00", "#00FFFF"];
+
+const BONUS_BOMB = 3;
+const BONUS_FIRE = 4;
+const BONUS_SPEED = 5;
+const BONUS_THROW = 6;
+
+const BONUS_COLORS = {
+    [BONUS_BOMB]: "#444444", 
+    [BONUS_FIRE]: "#D35400", 
+    [BONUS_SPEED]: "#1E824C", 
+    [BONUS_THROW]: "#8E44AD" 
+};
+
+const CONTROL_PROFILES = [
+    { id: "P1_STRZALKI", name: "Strzałki + Enter", up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", bomb: "Enter" },
+    { id: "P2_WASD", name: "WASD + Q", up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", bomb: "KeyQ" },
+    { id: "P3_NUMPAD", name: "Numpad 8546 + 0", up: "Numpad8", down: "Numpad5", left: "Numpad4", right: "Numpad6", bomb: "Numpad0" },
+    { id: "P4_UHJK", name: "UHJK + Spacja", up: "KeyU", down: "KeyJ", left: "KeyH", right: "KeyK", bomb: "Space" }
+];
+
+let canvas, ctx;
+let grid = [];
+let players = [];
+let bombs = [];
+let flyingBombs = []; 
+let explosions = [];
+let bonuses = {}; 
+let gameRunning = false;
+let gameOverState = false; 
+let keysHeld = {};
+let lastKeysHeld = {}; 
+
+let menuPlayerCount = 4;
+let menuActiveIndex = 0; 
+let playerSelectedProfileIdx = [0, 1, 2, 3]; 
+
+let menuPadCooldown = 0;
+let lastAvailableProfiles = [];
+
+function getGamepads() {
+    const getGamepadsFn = navigator.getGamepads || navigator.webkitGetGamepads || (() => []);
+    return getGamepadsFn.call(navigator);
+}
+
+// POPRAWIONE: Sprawdzamy teraz dodatkowo .connected, by eliminować niewpięte fizycznie "pady widma"
+function getAvailableProfilesForMenu() {
+    let list = [...CONTROL_PROFILES];
+    const gamepads = getGamepads();
+    let padCount = 0;
+    for (let i = 0; i < gamepads.length; i++) {
+        if (gamepads[i] && gamepads[i].connected) {
+            list.push({ id: `PAD_${i}`, name: `Pad ${padCount + 1} (${gamepads[i].id.includes("XBox") ? "XBox" : "Gamepad"})`, isPad: true, padIdx: i });
+            padCount++;
+        }
+    }
+    return list;
+}
+
+function applyDefaultPadAssignment() {
+    let available = getAvailableProfilesForMenu();
+    let padIndices = [];
+    let kbIndices = [];
+    
+    for (let i = 0; i < available.length; i++) {
+        if (available[i].isPad) {
+            padIndices.push(i);
+        } else {
+            kbIndices.push(i);
+        }
+    }
+    
+    let padAssigned = 0;
+    for (let i = 0; i < 4; i++) {
+        if (padAssigned < padIndices.length) {
+            playerSelectedProfileIdx[i] = padIndices[padAssigned];
+            padAssigned++;
+        } else {
+            let kbIdx = i - padAssigned;
+            playerSelectedProfileIdx[i] = kbIndices[kbIdx] !== undefined ? kbIndices[kbIdx] : 0;
+        }
+    }
+}
+
+function renderMenu() {
+    document.getElementById("val-count").innerText = `${menuPlayerCount} Graczy`;
+    const container = document.getElementById("players-config-list");
+    container.innerHTML = "";
+
+    let available = getAvailableProfilesForMenu();
+    lastAvailableProfiles = available;
+
+    for (let i = 0; i < menuPlayerCount; i++) {
+        if (playerSelectedProfileIdx[i] >= available.length) {
+            playerSelectedProfileIdx[i] = i % available.length;
+        }
+        let currentProfile = available[playerSelectedProfileIdx[i]];
+        
+        container.innerHTML += `
+            <div class="menu-item" id="item-p${i}" data-type="player" data-index="${i}">
+                <span class="menu-label" style="color:${PLAYER_COLORS[i]}">Gracz ${i+1}:</span>
+                <span class="menu-value" id="val-p${i}">${currentProfile ? currentProfile.name : "Klawiatura"}</span>
+            </div>
+        `;
+    }
+
+    let allItems = document.querySelectorAll(".menu-item, #start-btn");
+    allItems.forEach(el => el.classList.remove("active"));
+
+    if (menuActiveIndex === 0) {
+        document.getElementById("item-count").classList.add("active");
+    } else if (menuActiveIndex <= menuPlayerCount) {
+        let el = document.getElementById(`item-p${menuActiveIndex - 1}`);
+        if(el) el.classList.add("active");
+    } else {
+        document.getElementById("start-btn").classList.add("active");
+    }
+}
+
+function handleGamepadConnectionChange() {
+    applyDefaultPadAssignment();
+    renderMenu();
+}
+window.addEventListener("gamepadconnected", handleGamepadConnectionChange);
+window.addEventListener("gamepaddisconnected", handleGamepadConnectionChange);
+
+window.addEventListener("keydown", (e) => {
+    if (!gameRunning && !gameOverState) {
+        if (e.code === "Enter" || e.code === "Space") {
+            e.preventDefault();
+            startGame();
+            return;
+        }
+        
+        let available = getAvailableProfilesForMenu();
+        let maxIndex = menuPlayerCount + 1;
+
+        if (e.code === "ArrowUp") {
+            e.preventDefault();
+            menuActiveIndex = (menuActiveIndex - 1 + (maxIndex + 1)) % (maxIndex + 1);
+            renderMenu();
+        }
+        if (e.code === "ArrowDown") {
+            e.preventDefault();
+            menuActiveIndex = (menuActiveIndex + 1) % (maxIndex + 1);
+            renderMenu();
+        }
+        if (e.code === "ArrowLeft") {
+            e.preventDefault();
+            if (menuActiveIndex === 0) {
+                menuPlayerCount = menuPlayerCount === 2 ? 4 : menuPlayerCount - 1;
+            } else if (menuActiveIndex <= menuPlayerCount) {
+                let pIdx = menuActiveIndex - 1;
+                playerSelectedProfileIdx[pIdx] = (playerSelectedProfileIdx[pIdx] - 1 + available.length) % available.length;
+            }
+            renderMenu();
+        }
+        if (e.code === "ArrowRight") {
+            e.preventDefault();
+            if (menuActiveIndex === 0) {
+                menuPlayerCount = menuPlayerCount === 4 ? 2 : menuPlayerCount + 1;
+            } else if (menuActiveIndex <= menuPlayerCount) {
+                let pIdx = menuActiveIndex - 1;
+                playerSelectedProfileIdx[pIdx] = (playerSelectedProfileIdx[pIdx] + 1) % available.length;
+            }
+            renderMenu();
+        }
+    }
+    
+    if (gameOverState) {
+        if (e.code === "Enter" || e.code === "Space") {
+            e.preventDefault();
+            resetToMenu();
+            return;
+        }
+    }
+
+    keysHeld[e.code] = true;
+    if(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Numpad0"].includes(e.code)) {
+        e.preventDefault();
+    }
+    if (gameRunning && !gameOverState) handleKeyboardBombInput(e.code);
+});
+
+window.addEventListener("keyup", (e) => { keysHeld[e.code] = false; });
+
+window.addEventListener("mousedown", (e) => {
+    if (!gameRunning || gameOverState) return;
+    if (e.button === 0) {
+        const p = players.find(player => player.alive && player.profile && player.profile.id === "P1_STRZALKI");
+        if (p) {
+            let dx = 0, dy = 0;
+            if (keysHeld[p.profile.up]) dy = -1;
+            else if (keysHeld[p.profile.down]) dy = 1;
+            else if (keysHeld[p.profile.left]) dx = -1;
+            else if (keysHeld[p.profile.right]) dx = 1;
+
+            if (p.canThrow && (dx !== 0 || dy !== 0)) {
+                throwBomb(p, dx, dy);
+            } else {
+                spawnBombAt(p, p.gx, p.gy);
+            }
+        }
+    }
+});
+
+window.addEventListener("click", () => {
+    if (gameRunning && canvas) {
+        canvas.focus();
+    }
+});
+
+class Player {
+    constructor(id, gridX, gridY, color, profile) {
+        this.id = id;
+        this.gx = gridX;
+        this.gy = gridY;
+        this.x = this.gx * TILE_SIZE + TILE_SIZE / 2;
+        this.y = this.gy * TILE_SIZE + TILE_SIZE / 2;
+        this.color = color;
+        this.profile = profile; 
+        
+        this.maxBombs = 1;
+        this.activeBombs = 0;
+        this.bombRadius = 1; 
+        this.speedLevel = 0; 
+        this.throwLevel = 0; 
+        this.alive = true;
+        this.moveCooldown = 0; 
+        this.isPadBombDown = false; 
+
+        this.justPlacedBombTimer = 0; 
+        this.lastPlacedBomb = null;
+
+        this.lastDx = 0;
+        this.lastDy = 0;
+    }
+
+    get canThrow() { return this.throwLevel > 0; }
+
+    update() {
+        if (!this.alive) return;
+        if (this.moveCooldown > 0) this.moveCooldown--;
+        
+        if (this.justPlacedBombTimer > 0) {
+            this.justPlacedBombTimer--;
+            if (this.justPlacedBombTimer === 0) {
+                this.lastPlacedBomb = null;
+            }
+        }
+    }
+
+    draw() {
+        if (!this.alive) return;
+        let targetX = this.gx * TILE_SIZE + TILE_SIZE / 2;
+        let targetY = this.gy * TILE_SIZE + TILE_SIZE / 2;
+        
+        let animSpeed = 0.25 + (this.speedLevel * 0.05);
+        this.x += (targetX - this.x) * Math.min(0.6, animSpeed);
+        this.y += (targetY - this.y) * Math.min(0.6, animSpeed);
+
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, TILE_SIZE * 0.38, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.closePath();
+
+        ctx.fillStyle = "#000";
+        ctx.font = "bold 16px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(this.id + 1, this.x, this.y);
+    }
+
+    move(dx, dy) {
+        if (!this.alive || this.moveCooldown > 0) return;
+        let ngx = this.gx + dx;
+        let ngy = this.gy + dy;
+
+        if (isCellPassable(ngx, ngy)) {
+            this.gx = ngx;
+            this.gy = ngy;
+            
+            let isContinuous = (dx === this.lastDx && dy === this.lastDy);
+            this.lastDx = dx;
+            this.lastDy = dy;
+
+            if (isContinuous) {
+                this.moveCooldown = Math.max(3, 11 - this.speedLevel * 2); 
+            } else {
+                this.moveCooldown = 11; 
+            }
+            
+            let bKey = `${this.gx},${this.gy}`;
+            if (bonuses[bKey] !== undefined) {
+                let bType = bonuses[bKey];
+                delete bonuses[bKey];
+                if (bType === BONUS_BOMB) this.maxBombs++;
+                if (bType === BONUS_FIRE) this.bombRadius++;
+                if (bType === BONUS_SPEED) this.speedLevel++;
+                if (bType === BONUS_THROW) this.throwLevel++;
+            }
+        }
+    }
+}
+
+function getThrowTarget(startX, startY, radius, dx, dy) {
+    let startDist = radius + 1; 
+    let checkDist = startDist;
+    let targetX = startX;
+    let targetY = startY;
+
+    while (true) {
+        let cx = startX + dx * checkDist;
+        let cy = startY + dy * checkDist;
+        
+        if (!isCoordsInMap(cx, cy)) {
+            for (let bDist = checkDist - 1; bDist >= startDist; bDist--) {
+                let bx = startX + dx * bDist;
+                let by = startY + dy * bDist;
+                if (isCoordsInMap(bx, by) && grid[by][bx] === 0 && !getBombAt(bx, by) && !isTargetedByFlyingBomb(bx, by)) {
+                    targetX = bx;
+                    targetY = by;
+                    break;
+                }
+            }
+            break; 
+        }
+
+        if (grid[cy][cx] === 0 && !getBombAt(cx, cy) && !isTargetedByFlyingBomb(cx, cy)) {
+            targetX = cx;
+            targetY = cy;
+            break;
+        }
+        checkDist++; 
+    }
+    return { x: targetX, y: targetY };
+}
+
+function spawnBombAt(player, x, y) {
+    if (!player.alive || player.activeBombs >= player.maxBombs) return;
+    if (getBombAt(x, y) || isTargetedByFlyingBomb(x, y)) return;
+
+    let newBomb = { x: x, y: y, radius: player.bombRadius, timer: 150, owner: player };
+    bombs.push(newBomb);
+    player.activeBombs++;
+
+    if (player.canThrow) {
+        player.justPlacedBombTimer = 8; 
+        player.lastPlacedBomb = newBomb;
+    }
+}
+
+function throwBomb(player, dx, dy) {
+    if (!player.alive || player.activeBombs >= player.maxBombs) return;
+    let target = getThrowTarget(player.gx, player.gy, player.bombRadius, dx, dy);
+
+    if (target.x !== player.gx || target.y !== player.gy) {
+        let startPx = player.gx * TILE_SIZE + TILE_SIZE / 2;
+        let startPy = player.gy * TILE_SIZE + TILE_SIZE / 2;
+        let targetPx = target.x * TILE_SIZE + TILE_SIZE / 2;
+        let targetPy = target.y * TILE_SIZE + TILE_SIZE / 2;
+        
+        let distance = Math.sqrt(Math.pow(targetPx - startPx, 2) + Math.pow(targetPy - startPy, 2));
+
+        flyingBombs.push({
+            startX: player.gx, startY: player.gy,
+            targetX: target.x, targetY: target.y,
+            px: startPx, py: startPy,
+            targetPx: targetPx, targetPy: targetPy,
+            currentPx: startPx, currentPy: startPy,
+            distanceTraveled: 0,
+            totalDistance: distance,
+            radius: player.bombRadius,
+            throwLevel: player.throwLevel, 
+            owner: player
+        });
+        player.activeBombs++;
+        player.moveCooldown = 12; 
+    } else {
+        spawnBombAt(player, player.gx, player.gy);
+    }
+}
+
+function throwExistingBomb(player, dx, dy) {
+    if (!player.alive || !player.canThrow || !player.lastPlacedBomb) return false;
+    let b = player.lastPlacedBomb;
+    let bIdx = bombs.indexOf(b);
+    if (bIdx === -1) return false;
+
+    let target = getThrowTarget(b.x, b.y, b.radius, dx, dy);
+    if (target.x !== b.x || target.y !== b.y) {
+        bombs.splice(bIdx, 1);
+
+        let startPx = b.x * TILE_SIZE + TILE_SIZE / 2;
+        let startPy = b.y * TILE_SIZE + TILE_SIZE / 2;
+        let targetPx = target.x * TILE_SIZE + TILE_SIZE / 2;
+        let targetPy = target.y * TILE_SIZE + TILE_SIZE / 2;
+        let distance = Math.sqrt(Math.pow(targetPx - startPx, 2) + Math.pow(targetPy - startPy, 2));
+
+        flyingBombs.push({
+            startX: b.x, startY: b.y,
+            targetX: target.x, targetY: target.y,
+            px: startPx, py: startPy,
+            targetPx: targetPx, targetPy: targetPy,
+            currentPx: startPx, currentPy: startPy,
+            distanceTraveled: 0,
+            totalDistance: distance,
+            radius: b.radius,
+            throwLevel: player.throwLevel,
+            owner: player
+        });
+        player.justPlacedBombTimer = 0;
+        player.lastPlacedBomb = null;
+        player.moveCooldown = 12; 
+        return true; 
+    }
+    return false;
+}
+
+function isTargetedByFlyingBomb(x, y) {
+    return flyingBombs.some(fb => fb.targetX === x && fb.targetY === y);
+}
+
+function handleKeyboardBombInput(code) {
+    players.forEach(p => {
+        if (!p.alive || !p.profile || p.profile.isPad) return;
+        if (code === p.profile.bomb) {
+            let dx = 0, dy = 0;
+            if (keysHeld[p.profile.up]) dy = -1;
+            else if (keysHeld[p.profile.down]) dy = 1;
+            else if (keysHeld[p.profile.left]) dx = -1;
+            else if (keysHeld[p.profile.right]) dx = 1;
+
+            if (p.canThrow && (dx !== 0 || dy !== 0)) throwBomb(p, dx, dy);
+            else spawnBombAt(p, p.gx, p.gy);
+        }
+    });
+}
+
+function handleKeyboardMovement() {
+    players.forEach(p => {
+        if (!p.alive || p.moveCooldown > 0 || !p.profile || p.profile.isPad) return;
+        
+        let dx = 0, dy = 0;
+
+        if (keysHeld[p.profile.up]) { dy = -1; }
+        else if (keysHeld[p.profile.down]) { dy = 1; }
+        else if (keysHeld[p.profile.left]) { dx = -1; }
+        else if (keysHeld[p.profile.right]) { dx = 1; }
+
+        if (dx !== 0 || dy !== 0) {
+            if (p.justPlacedBombTimer > 0 && p.canThrow) {
+                let interceptedAndThrown = throwExistingBomb(p, dx, dy);
+                if (interceptedAndThrown) return; 
+            }
+            p.move(dx, dy);
+        } else {
+            p.lastDx = 0;
+            p.lastDy = 0;
+        }
+    });
+
+    lastKeysHeld = { ...keysHeld };
+}
+
+function handleGamepadInput() {
+    if (!gameRunning) return;
+    const gamepads = getGamepads();
+    
+    players.forEach(p => {
+        if (!p.alive || !p.profile || !p.profile.isPad) return;
+        
+        let pad = gamepads[p.profile.padIdx];
+        if (!pad) return;
+
+        let dx = 0, dy = 0;
+        const threshold = 0.5;
+
+        if (pad.buttons?.[14]?.pressed || (pad.axes && pad.axes[0] < -threshold)) dx = -1;
+        else if (pad.buttons?.[15]?.pressed || (pad.axes && pad.axes[0] > threshold)) dx = 1;
+        else if (pad.buttons?.[12]?.pressed || (pad.axes && pad.axes[1] < -threshold)) dy = -1;
+        else if (pad.buttons?.[13]?.pressed || (pad.axes && pad.axes[1] > threshold)) dy = 1;
+
+        const bombPressed = pad.buttons?.[0]?.pressed;
+
+        if (dx !== 0 || dy !== 0) {
+            if (p.moveCooldown === 0) {
+                if (!bombPressed && p.justPlacedBombTimer > 0 && p.canThrow) {
+                    let intercepted = throwExistingBomb(p, dx, dy);
+                    if (intercepted) return;
+                }
+                if (!bombPressed) {
+                    p.move(dx, dy);
+                }
+            }
+        } else {
+            p.lastDx = 0;
+            p.lastDy = 0;
+        }
+
+        if (bombPressed) {
+            if (!p.isPadBombDown) {
+                p.isPadBombDown = true;
+                if (p.canThrow && (dx !== 0 || dy !== 0)) throwBomb(p, dx, dy);
+                else spawnBombAt(p, p.gx, p.gy);
+            }
+        } else {
+            p.isPadBombDown = false;
+        }
+    });
+}
+
+function handleMenuGamepadInput() {
+    if (menuPadCooldown > 0) {
+        menuPadCooldown--;
+        return;
+    }
+
+    const gamepads = getGamepads();
+    let available = getAvailableProfilesForMenu();
+    lastAvailableProfiles = available;
+
+    let maxIndex = menuPlayerCount + 1;
+
+    for (let i = 0; i < gamepads.length; i++) {
+        let pad = gamepads[i];
+        if (!pad || !pad.connected) continue;
+
+        let dx = 0, dy = 0;
+        const threshold = 0.5;
+
+        if (pad.buttons?.[12]?.pressed || (pad.axes && pad.axes[1] < -threshold)) dy = -1;
+        else if (pad.buttons?.[13]?.pressed || (pad.axes && pad.axes[1] > threshold)) dy = 1;
+        else if (pad.buttons?.[14]?.pressed || (pad.axes && pad.axes[0] < -threshold)) dx = -1;
+        else if (pad.buttons?.[15]?.pressed || (pad.axes && pad.axes[0] > threshold)) dx = 1;
+
+        const buttonA = pad.buttons?.[0]?.pressed;
+
+        if (buttonA) {
+            startGame();
+            menuPadCooldown = 25;
+            break;
+        }
+
+        if (dy === -1) {
+            menuActiveIndex = (menuActiveIndex - 1 + (maxIndex + 1)) % (maxIndex + 1);
+            renderMenu();
+            menuPadCooldown = 15;
+            break;
+        }
+        if (dy === 1) {
+            menuActiveIndex = (menuActiveIndex + 1) % (maxIndex + 1);
+            renderMenu();
+            menuPadCooldown = 15;
+            break;
+        }
+
+        if (dx === -1) {
+            if (menuActiveIndex === 0) {
+                menuPlayerCount = menuPlayerCount === 2 ? 4 : menuPlayerCount - 1;
+            } else if (menuActiveIndex <= menuPlayerCount) {
+                let pIdx = menuActiveIndex - 1;
+                playerSelectedProfileIdx[pIdx] = (playerSelectedProfileIdx[pIdx] - 1 + available.length) % available.length;
+            }
+            renderMenu();
+            menuPadCooldown = 15;
+            break;
+        }
+        if (dx === 1) {
+            if (menuActiveIndex === 0) {
+                menuPlayerCount = menuPlayerCount === 4 ? 2 : menuPlayerCount + 1;
+            } else if (menuActiveIndex <= menuPlayerCount) {
+                let pIdx = menuActiveIndex - 1;
+                playerSelectedProfileIdx[pIdx] = (playerSelectedProfileIdx[pIdx] + 1) % available.length;
+            }
+            renderMenu();
+            menuPadCooldown = 15;
+            break;
+        }
+    }
+}
+
+function handleGameOverGamepadInput() {
+    const gamepads = getGamepads();
+    for (let i = 0; i < gamepads.length; i++) {
+        let pad = gamepads[i];
+        if (pad && pad.connected && pad.buttons?.[0]?.pressed) {
+            resetToMenu();
+            break;
+        }
+    }
+}
+
+function generateMap() {
+    grid = [];
+    for (let y = 0; y < GRID_HEIGHT; y++) grid.push(new Array(GRID_WIDTH).fill(0));
+
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            if (y === 0 || y === GRID_HEIGHT - 1 || x === 0 || x === GRID_WIDTH - 1 || (y % 2 === 0 && x % 2 === 0)) {
+                grid[y][x] = 1;
+            }
+        }
+    }
+
+    const safeZones = [ "1,1", "1,2", "2,1", `${GRID_WIDTH-2},1`, `${GRID_WIDTH-3},1`, `${GRID_WIDTH-2},2`, `1,${GRID_HEIGHT-2}`, `1,${GRID_HEIGHT-3}`, `2,${GRID_HEIGHT-2}`, `${GRID_WIDTH-2},${GRID_HEIGHT-2}`, `${GRID_WIDTH-3},${GRID_HEIGHT-2}`, `${GRID_WIDTH-2},${GRID_HEIGHT-3}`];
+
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            if (grid[y][x] === 0 && !safeZones.includes(`${x},${y}`) && Math.random() < 0.48) {
+                grid[y][x] = 2;
+            }
+        }
+    }
+}
+
+function drawCornerHUD() {
+    const hudPositions = [
+        { x: 0, y: 0 },                           
+        { x: GRID_WIDTH - 3, y: GRID_HEIGHT - 1 }, 
+        { x: GRID_WIDTH - 3, y: 0 },          
+        { x: 0, y: GRID_HEIGHT - 1 }          
+    ];
+
+    players.forEach((p, idx) => {
+        let pos = hudPositions[idx];
+        let bX = pos.x * TILE_SIZE;
+        let bY = pos.y * TILE_SIZE;
+        let w = TILE_SIZE * 3;
+        let h = TILE_SIZE;
+
+        ctx.fillStyle = "rgba(240, 240, 240, 0.94)";
+        ctx.fillRect(bX + 2, bY + 2, w - 4, h - 4);
+
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 5;
+        ctx.strokeRect(bX + 2, bY + 2, w - 4, h - 4);
+
+        ctx.textBaseline = "middle";
+        
+        if (!p.alive) {
+            ctx.fillStyle = "rgba(200, 0, 0, 0.8)";
+            ctx.font = "bold 18px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("ELIMINACJA", bX + w/2, bY + h/2);
+        } else {
+            let colWidth = w / 4;
+            let startX = bX + colWidth / 2;
+            let centerY = bY + h / 2;
+
+            ctx.textAlign = "center";
+
+            let itemX = startX + (colWidth * 0);
+            ctx.font = "19px Arial";
+            ctx.fillStyle = "#000";
+            ctx.fillText("💣", itemX - 5, centerY);
+            ctx.font = "bold 15px Arial";
+            ctx.fillStyle = BONUS_COLORS[BONUS_BOMB];
+            ctx.fillText(p.maxBombs, itemX + 8, centerY);
+
+            itemX = startX + (colWidth * 1);
+            ctx.font = "19px Arial";
+            ctx.fillStyle = "#000";
+            ctx.fillText("🔥", itemX - 5, centerY);
+            ctx.font = "bold 15px Arial";
+            ctx.fillStyle = BONUS_COLORS[BONUS_FIRE];
+            ctx.fillText(p.bombRadius, itemX + 8, centerY);
+
+            itemX = startX + (colWidth * 2);
+            ctx.font = "19px Arial";
+            ctx.fillStyle = "#000";
+            ctx.fillText("⚡", itemX - 4, centerY);
+            ctx.font = "bold 15px Arial";
+            ctx.fillStyle = BONUS_COLORS[BONUS_SPEED];
+            ctx.fillText(p.speedLevel, itemX + 7, centerY);
+
+            itemX = startX + (colWidth * 3);
+            ctx.font = "20px Arial";
+            ctx.fillStyle = "#000";
+            ctx.fillText("🔫", itemX - 5, centerY);
+            ctx.font = "bold 15px Arial";
+            ctx.fillStyle = BONUS_COLORS[BONUS_THROW];
+            ctx.fillText(p.throwLevel, itemX + 9, centerY);
+        }
+    });
+}
+
+function isCoordsInMap(x, y) { return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT; }
+function isCellPassable(x, y) {
+    if (!isCoordsInMap(x, y)) return false;
+    if (grid[y][x] !== 0) return false; 
+    if (getBombAt(x, y)) return false; 
+    return true;
+}
+function getBombAt(x, y) { return bombs.find(b => b.x === x && b.y === y); }
+
+function explodeBomb(bombIdx) {
+    let b = bombs[bombIdx];
+    b.owner.activeBombs--;
+    
+    let affectedTiles = [{x: b.x, y: b.y}]; 
+    let dirs = [{x:-1, y:0}, {x:1, y:0}, {x:0, y:-1}, {x:0, y:1}];
+
+    dirs.forEach(d => {
+        for (let r = 1; r <= b.radius; r++) {
+            let nx = b.x + d.x * r;
+            let ny = b.y + d.y * r;
+
+            if (!isCoordsInMap(nx, ny)) break;
+            let cell = grid[ny][nx];
+            if (cell === 1) break; 
+
+            affectedTiles.push({x: nx, y: ny});
+            
+            if (cell === 2) { 
+                grid[ny][nx] = 0;
+                if (Math.random() < 0.48) { 
+                    bonuses[`${nx},${ny}`] = [BONUS_BOMB, BONUS_FIRE, BONUS_SPEED, BONUS_THROW][Math.floor(Math.random()*4)];
+                }
+                break; 
+            }
+            
+            let otherBomb = getBombAt(nx, ny);
+            if(otherBomb && otherBomb.timer > 5) otherBomb.timer = 5; 
+        }
+    });
+
+    affectedTiles.forEach(t => {
+        explosions.push({x: t.x, y: t.y, duration: 25});
+    });
+    bombs.splice(bombIdx, 1);
+}
+
+function updateGame() {
+    if (gameOverState) return;
+
+    handleKeyboardMovement();
+    handleGamepadInput();
+    players.forEach(p => p.update());
+
+    for (let i = flyingBombs.length - 1; i >= 0; i--) {
+        let fb = flyingBombs[i];
+        
+        let pixelsPerFrame = 4.5 + (fb.throwLevel * 1.5);
+        fb.distanceTraveled += pixelsPerFrame;
+
+        let progress = Math.min(1, fb.distanceTraveled / fb.totalDistance);
+
+        fb.currentPx = fb.px + (fb.targetPx - fb.px) * progress;
+        fb.currentPy = fb.py + (fb.targetPy - fb.py) * progress;
+
+        if (progress >= 1) {
+            bombs.push({ x: fb.targetX, y: fb.targetY, radius: fb.radius, timer: 120, owner: fb.owner });
+            flyingBombs.splice(i, 1);
+        }
+    }
+
+    for (let i = bombs.length - 1; i >= 0; i--) {
+        bombs[i].timer--;
+        if (bombs[i].timer <= 0) explodeBomb(i);
+    }
+
+    for (let i = explosions.length - 1; i >= 0; i--) {
+        let exp = explosions[i];
+        exp.duration--;
+        players.forEach(p => {
+            if (p.alive && p.gx === exp.x && p.gy === exp.y) p.alive = false;
+        });
+        if (exp.duration <= 0) explosions.splice(i, 1);
+    }
+
+    let alivePlayers = players.filter(p => p.alive);
+    if (alivePlayers.length <= 1 && players.length > 1) {
+        gameOverState = true;
+    }
+}
+
+function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.lineWidth = 1;
+    ctx.lineJoin = "miter";
+
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            let rx = x * TILE_SIZE;
+            let ry = y * TILE_SIZE;
+            if (grid[y][x] === 1) {
+                ctx.fillStyle = COLOR_WALL; ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = "#333"; ctx.strokeRect(rx + 0.5, ry + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+            } else if (grid[y][x] === 2) {
+                ctx.fillStyle = COLOR_CRATE; ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = "#4A2507"; ctx.strokeRect(rx + 0.5, ry + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+            } else {
+                ctx.fillStyle = (x % 2 === 0 && y % 2 === 0) ? COLOR_FLOOR_GRID : COLOR_FLOOR;
+                ctx.fillRect(rx, ry, TILE_SIZE, TILE_SIZE);
+            }
+        }
+    }
+
+    for (let key in bonuses) {
+        let [bx, by] = key.split(",").map(Number);
+        let bType = bonuses[key];
+        
+        ctx.beginPath();
+        ctx.arc(bx * TILE_SIZE + TILE_SIZE/2, by * TILE_SIZE + TILE_SIZE/2, TILE_SIZE * 0.35, 0, Math.PI*2);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.45)"; 
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff"; 
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.closePath();
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        
+        let label = "💣";
+        if (bType === BONUS_FIRE) label = "🔥";
+        if (bType === BONUS_SPEED) label = "⚡";
+        if (bType === BONUS_THROW) label = "🔫";
+        
+        ctx.fillText(label, bx * TILE_SIZE + TILE_SIZE/2, by * TILE_SIZE + TILE_SIZE/2);
+    }
+
+    bombs.forEach(b => {
+        let cx = b.x * TILE_SIZE + TILE_SIZE/2;
+        let cy = b.y * TILE_SIZE + TILE_SIZE/2;
+        let pulse = Math.sin(b.timer * 0.2) * 1.5;
+        ctx.beginPath(); ctx.arc(cx, cy, 16 + pulse, 0, Math.PI*2);
+        ctx.fillStyle = COLOR_BOMB; ctx.fill(); ctx.strokeStyle="#fff"; ctx.stroke(); ctx.closePath();
+        if (Math.floor(b.timer / 10) % 2 === 0) {
+            ctx.beginPath(); ctx.arc(cx, cy - 12, 3, 0, Math.PI*2); ctx.fillStyle = "red"; ctx.fill(); ctx.closePath();
+        }
+    });
+
+    flyingBombs.forEach(fb => {
+        let curX = fb.currentPx;
+        let curY = fb.currentPy;
+        let currentProgress = fb.distanceTraveled / fb.totalDistance;
+        let currentRadius = 16 * (0.5 + 0.5 * Math.sin(currentProgress * Math.PI));
+
+        ctx.beginPath(); ctx.arc(curX, curY + 4, currentRadius, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill(); ctx.closePath();
+
+        ctx.beginPath(); ctx.arc(curX, curY, currentRadius, 0, Math.PI * 2);
+        ctx.fillStyle = COLOR_BOMB; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.closePath();
+
+        ctx.beginPath(); ctx.arc(curX, curY - (currentRadius * 0.75), 2.5, 0, Math.PI * 2); 
+        ctx.fillStyle = "orange"; ctx.fill(); ctx.closePath();
+    });
+
+    ctx.fillStyle = COLOR_EXPLOSION;
+    explosions.forEach(exp => {
+        ctx.fillRect(exp.x * TILE_SIZE, exp.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    });
+
+    players.forEach(p => {
+        if (!p.alive) return;
+
+        let bombUnderneath = getBombAt(p.gx, p.gy);
+        if (bombUnderneath) {
+            let pulseScale = 1 + 0.15 * Math.sin(Date.now() / 120);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, TILE_SIZE * 0.56 * pulseScale, 0, Math.PI * 2);
+            ctx.strokeStyle = "#ff2200"; 
+            ctx.lineWidth = 3;
+            ctx.setLineDash([6, 3]); 
+            ctx.stroke();
+            ctx.setLineDash([]); 
+            ctx.closePath();
+        }
+
+        p.draw();
+    });
+
+    drawCornerHUD();
+
+    if (gameOverState) {
+        let alivePlayers = players.filter(p => p.alive);
+        ctx.fillStyle = "rgba(0,0,0,0.85)"; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = "bold 34px Arial"; 
+        ctx.textAlign = "center";
+        
+        if (alivePlayers.length === 1) {
+            ctx.fillStyle = alivePlayers[0].color;
+            ctx.fillText(`GRACZ ${alivePlayers[0].id + 1} WYGRYWA!`, canvas.width / 2, canvas.height / 2 - 20);
+        } else {
+            ctx.fillStyle = "#fff";
+            ctx.fillText("REMIS! WSZYSCY ZGINĘLI!", canvas.width / 2, canvas.height / 2 - 20);
+        }
+        
+        ctx.fillStyle = "#aaa";
+        ctx.font = "20px Arial";
+        ctx.fillText("Naciśnij ENTER lub przycisk A, aby wrócić do menu", canvas.width / 2, canvas.height / 2 + 30);
+    }
+}
+
+function mainLoop() {
+    if (gameRunning) {
+        updateGame();
+        drawGame();
+        if (gameOverState) {
+            handleGameOverGamepadInput();
+        }
+    } else {
+        handleMenuGamepadInput(); 
+    }
+    requestAnimationFrame(mainLoop);
+}
+
+function startGame() {
+    document.getElementById("menu").style.display = "none";
+    document.getElementById("game-container").style.display = "block";
+    
+    canvas = document.getElementById("gameCanvas");
+    ctx = canvas.getContext("2d");
+
+    canvas.focus();
+    setTimeout(() => {
+        if (canvas) canvas.focus();
+    }, 50);
+
+    generateMap();
+
+    const startPositions = [ 
+        {x: 1, y: 1}, 
+        {x: GRID_WIDTH - 2, y: GRID_HEIGHT - 2}, 
+        {x: GRID_WIDTH - 2, y: 1}, 
+        {x: 1, y: GRID_HEIGHT - 2} 
+    ];
+
+    players = [];
+    flyingBombs = [];
+    bombs = [];
+    explosions = [];
+    bonuses = {};
+    keysHeld = {};
+    lastKeysHeld = {};
+    
+    let available = getAvailableProfilesForMenu();
+
+    for (let i = 0; i < menuPlayerCount; i++) {
+        let profileIdx = playerSelectedProfileIdx[i];
+        
+        if (profileIdx >= available.length) {
+            profileIdx = 0;
+        }
+        
+        let profile = available[profileIdx];
+        
+        if (!profile) {
+            profile = CONTROL_PROFILES[i % CONTROL_PROFILES.length];
+        }
+
+        let newPlayer = new Player(i, startPositions[i].x, startPositions[i].y, PLAYER_COLORS[i], profile);
+        
+        if (profile && profile.isPad) {
+            newPlayer.isPadBombDown = true;
+        }
+        
+        players.push(newPlayer);
+    }
+
+    gameOverState = false;
+    gameRunning = true;
+}
+
+function resetToMenu() {
+    gameRunning = false;
+    gameOverState = false;
+    document.getElementById("game-container").style.display = "none";
+    document.getElementById("menu").style.display = "block";
+    
+    menuActiveIndex = 0; 
+    
+    applyDefaultPadAssignment();
+    renderMenu();
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    applyDefaultPadAssignment(); 
+    renderMenu();
+    requestAnimationFrame(mainLoop); 
+});
+</script>
+
+</body>
+</html>
