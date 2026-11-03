@@ -3,82 +3,527 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moje Aplikacje Webowe</title>
+    <title>Stoper Treningowy</title>
     <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-color: #ff9800;
+            --text-color: #ffffff;
+            --text-dim: #b0b0b0;
+            --danger-color: #f44336;
+            --success-color: #4caf50;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #f1f2f6;
-            color: #2f3542;
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 20px;
-        }
-        h1 { color: #1e272e; text-align: center; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #747d8c; margin-bottom: 40px; }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-        }
-        .card {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            text-decoration: none;
-            color: inherit;
-            transition: all 0.2s ease;
-            border: 1px solid #e4e7eb;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
         }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-            border-left: 5px solid #ff4757;
-        }
-        /* Specjalny kolor paska przy najechaniu na konkretną kartę */
-        .card.garaz:hover { border-left-color: #2ed573; }
-        .card.bomber:hover { border-left-color: #ffa502; }
 
-        .card h2 { margin: 0 0 10px 0; font-size: 20px; }
-        .card p { margin: 0; font-size: 14px; color: #57606f; line-height: 1.5; }
-        .tag {
-            align-self: flex-start;
-            margin-top: auto;
-            padding: 4px 8px;
-            background: #f1f2f6;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: bold;
-            color: #747d8c;
+        .container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Display Panel */
+        .display-panel {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 180px;
+            border: 2px solid #2a2a2a;
+        }
+
+        .status-label {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--accent-color);
             text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+
+        .main-timer {
+            font-size: 4rem;
+            font-weight: 800;
+            font-family: monospace;
+            line-height: 1;
+            margin: 10px 0;
+        }
+
+        .reps-counter {
+            font-size: 1.2rem;
+            color: var(--text-dim);
+        }
+
+        .reps-counter span {
+            color: var(--text-color);
+            font-weight: bold;
+        }
+
+        /* Buttons Grid */
+        .buttons-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .btn-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            border: 1px solid #333;
+        }
+
+        .start-btn {
+            flex: 1;
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            padding: 16px 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .start-btn:active {
+            transform: scale(0.98);
+        }
+
+        .start-btn .preset-info {
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin-top: 2px;
+            opacity: 1;
+            color: #000;
             letter-spacing: 0.5px;
+        }
+
+        .settings-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .settings-btn:hover, .settings-btn:active {
+            color: var(--text-color);
+        }
+
+        .settings-btn svg {
+            width: 28px;
+            height: 28px;
+            fill: currentColor;
+        }
+
+        .stop-btn {
+            background-color: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 15px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            display: none;
+            width: 100%;
+        }
+
+        /* Modal / Settings Dialog */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .modal-backdrop.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background: var(--card-bg);
+            width: 90%;
+            max-width: 400px;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 1px solid #444;
+        }
+
+        .modal-header {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: var(--accent-color);
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+        }
+
+        .setting-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .setting-label span.val {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            background: #444;
+            border-radius: 3px;
+            outline: none;
+            accent-color: var(--accent-color);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .save-btn {
+            background: var(--accent-color);
+            color: #000;
+        }
+
+        .cancel-btn {
+            background: #333;
+            color: var(--text-color);
         }
     </style>
 </head>
 <body>
 
-    <h1>Moje Portfolio Aplikacji Webowych</h1>
-    <div class="subtitle">Kolekcja projektów stworzonych wspólnie z AI</div>
-
-    <div class="grid">
-        
-        <!-- KARTA: SYMULATOR GARAŻU -->
-        <a href="symulator-garazu/" class="card garaz">
-            <h2>🚗 Symulator wjazdu do garażu</h2>
-            <p>Interaktywne narzędzie do sprawdzania geometrii podjazdu o długości 305 cm. Wykrywa kolizje podwozia w czasie rzeczywistym.</p>
-            <div class="tag" style="margin-top: 15px;">Narzędzie / Canvas</div>
-        </a>
-
-        <!-- KARTA: BOMBERMAN -->
-        <a href="Bomberman/" class="card bomber">
-            <h2>💣 Klasyczny Bomberman</h2>
-            <p>Zręcznościowa gra retro przeniesiona do przeglądarki. Podkładaj bomby, niszcz przeszkody i unikaj eksplozji!</p>
-            <div class="tag" style="margin-top: 15px;">Gra / JS</div>
-        </a>
-
+<div class="container">
+    <div class="display-panel">
+        <div class="status-label" id="statusLabel">GOTOWY</div>
+        <div class="main-timer" id="mainTimer">00</div>
+        <div class="reps-counter" id="repsCounter">Powtórzenia: <span>0 / 0</span></div>
     </div>
+
+    <div class="buttons-grid">
+        <!-- Przycisk 1 -->
+        <div class="btn-card">
+            <button class="start-btn" onclick="startRoutine(0)">
+                <div class="preset-info" id="info-0">Pauza: 2s | Czas: 10s | Ilość: 5</div>
+            </button>
+            <button class="settings-btn" onclick="openSettings(0)" aria-label="Ustawienia 1">
+                <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59-0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+            </button>
+        </div>
+
+        <!-- Przycisk 2 -->
+        <div class="btn-card">
+            <button class="start-btn" onclick="startRoutine(1)">
+                <div class="preset-info" id="info-1">Pauza: 3s | Czas: 15s | Ilość: 10</div>
+            </button>
+            <button class="settings-btn" onclick="openSettings(1)" aria-label="Ustawienia 2">
+                <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59-0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+            </button>
+        </div>
+
+        <!-- Przycisk 3 -->
+        <div class="btn-card">
+            <button class="start-btn" onclick="startRoutine(2)">
+                <div class="preset-info" id="info-2">Pauza: 5s | Czas: 30s | Ilość: 15</div>
+            </button>
+            <button class="settings-btn" onclick="openSettings(2)" aria-label="Ustawienia 3">
+                <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59-0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <button class="stop-btn" id="stopBtn" onclick="stopRoutine()">ZATRZYMAJ</button>
+</div>
+
+<!-- Modal Ustawień -->
+<div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+        <div class="modal-header" id="modalTitle">Konfiguracja</div>
+        
+        <div class="setting-group">
+            <div class="setting-label">
+                <span>Pauza (1 - 10 s):</span>
+                <span class="val" id="pauseVal">2s</span>
+            </div>
+            <input type="range" id="pauseInput" min="1" max="10" value="2" oninput="updateModalVals()">
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-label">
+                <span>Czas ćwiczenia (5 - 60 s):</span>
+                <span class="val" id="timeVal">10s</span>
+            </div>
+            <input type="range" id="timeInput" min="5" max="60" value="10" oninput="updateModalVals()">
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-label">
+                <span>Ilość powtórzeń (3 - 50):</span>
+                <span class="val" id="countVal">5</span>
+            </div>
+            <input type="range" id="countInput" min="3" max="50" value="5" oninput="updateModalVals()">
+        </div>
+
+        <div class="modal-actions">
+            <button class="modal-btn cancel-btn" onclick="closeSettings()">Anuluj</button>
+            <button class="modal-btn save-btn" onclick="saveSettings()">Zapisz</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Konfiguracje domyślne lub wczytane z localStorage
+    let presets = JSON.parse(localStorage.getItem('timer_presets')) || [
+        { pause: 2, time: 10, count: 5 },
+        { pause: 3, time: 15, count: 10 },
+        { pause: 5, time: 30, count: 15 }
+    ];
+
+    let timerId = null;
+    let isRunning = false;
+    let activePresetIdx = null;
+
+    // Elementy interfejsu
+    const statusLabel = document.getElementById('statusLabel');
+    const mainTimer = document.getElementById('mainTimer');
+    const repsCounter = document.getElementById('repsCounter');
+    const stopBtn = document.getElementById('stopBtn');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+
+    // Liczby słownie do syntezy mowy
+    const numbersInWords = [
+        "", "JEDEN", "DWA", "TRZY", "CZTERY", "PIĘĆ", "SZEŚĆ", "SIEDEM", "OSIEM", "DZIEWIĘĆ", "DZIESIĘĆ",
+        "JEDENASTACIE", "DWANASTACIE", "TRZYNASTACIE", "CZTERNASTACIE", "PIĘTNAŚCIE", "SZESNAŚCIE",
+        "SIEDEMNAŚCIE", "OSIEMNAŚCIE", "DZIEWIĘTNAŚCIE", "DWADZIEŚCIA", "DWADZIEŚCIA JEDEN", "DWADZIEŚCIA DWA",
+        "DWADZIEŚCIA TRZY", "DWADZIEŚCIA CZTERY", "DWADZIEŚCIA PIĘĆ", "DWADZIEŚCIA SZEŚĆ", "DWADZIEŚCIA SIEDEM",
+        "DWADZIEŚCIA OSIEM", "DWADZIEŚCIA DZIEWIĘĆ", "TRZYDZIEŚCI", "TRZYDZIEŚCI JEDEN", "TRZYDZIEŚCI DWA",
+        "TRZYDZIEŚCI TRZY", "TRZYDZIEŚCI CZTERY", "TRZYDZIEŚCI PIĘĆ", "TRZYDZIEŚCI SZEŚĆ", "TRZYDZIEŚCI SIEDEM",
+        "TRZYDZIEŚCI OSIEM", "TRZYDZIEŚCI DZIEWIĘĆ", "CZTERDZIEŚCI", "CZTERDZIEŚCI JEDEN", "CZTERDZIEŚCI DWA",
+        "CZTERDZIEŚCI TRZY", "CZTERDZIEŚCI CZTERY", "CZTERDZIEŚCI PIĘĆ", "CZTERDZIEŚCI SZEŚĆ", "CZTERDZIEŚCI SIEDEM",
+        "CZTERDZIEŚCI OSIEM", "CZTERDZIEŚCI DZIEWIĘĆ", "PIĘĆDZIESIĄT"
+    ];
+
+    function getNumberWord(n) {
+        return numbersInWords[n] || n.toString();
+    }
+
+    function updatePresetInfo() {
+        for (let i = 0; i < 3; i++) {
+            const p = presets[i];
+            document.getElementById(`info-${i}`).innerText = `Pauza: ${p.pause}s | Czas: ${p.time}s | Ilość: ${p.count}`;
+        }
+    }
+
+    function speak(text) {
+        if ('speechSynthesis' in window && text.trim() !== '') {
+            window.speechSynthesis.cancel(); // Przerwij poprzednie
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'pl-PL';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Główna logika odliczania
+    async function startRoutine(idx) {
+        if (isRunning) stopRoutine();
+
+        // Odblokuj Web Speech API na urządzeniach mobilnych
+        speak("");
+
+        isRunning = true;
+        activePresetIdx = idx;
+        const config = presets[idx];
+        
+        stopBtn.style.display = 'block';
+
+        for (let currentRep = 1; currentRep <= config.count; currentRep++) {
+            if (!isRunning) break;
+
+            // Faza PAUZY
+            statusLabel.innerText = "PAUZA";
+            statusLabel.style.color = "var(--accent-color)";
+            repsCounter.innerHTML = `Powtórzenia: <span>${currentRep} / ${config.count}</span>`;
+            
+            await countdown(config.pause);
+
+            if (!isRunning) break;
+
+            // Faza ĆWICZENIA
+            statusLabel.innerText = "ĆWICZENIE";
+            statusLabel.style.color = "var(--success-color)";
+            
+            await countdown(config.time);
+
+            if (!isRunning) break;
+
+            // Komunikat głosowy po wykonaniu czasu ćwiczenia
+            speak(getNumberWord(currentRep));
+
+            // Odczekaj dokładnie 2 sekundy przed słowem "KONIEC" po ostatnim powtórzeniu
+            if (currentRep === config.count) {
+                await delay(2000);
+            }
+        }
+
+        if (isRunning) {
+            statusLabel.innerText = "KONIEC";
+            statusLabel.style.color = "var(--text-color)";
+            mainTimer.innerText = "00";
+            speak("KONIEC");
+            isRunning = false;
+            stopBtn.style.display = 'none';
+        }
+    }
+
+    function countdown(seconds) {
+        return new Promise((resolve) => {
+            let left = seconds;
+            mainTimer.innerText = left.toString().padStart(2, '0');
+
+            timerId = setInterval(() => {
+                left--;
+                if (left >= 0) {
+                    mainTimer.innerText = left.toString().padStart(2, '0');
+                }
+                if (left <= 0) {
+                    clearInterval(timerId);
+                    timerId = null;
+                    resolve();
+                }
+            }, 1000);
+        });
+    }
+
+    function stopRoutine() {
+        isRunning = false;
+        if (timerId) {
+            clearInterval(timerId);
+            timerId = null;
+        }
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+        statusLabel.innerText = "ZATRZYMANO";
+        statusLabel.style.color = "var(--danger-color)";
+        mainTimer.innerText = "00";
+        stopBtn.style.display = 'none';
+    }
+
+    // Modal Ustawień
+    let currentEditIdx = null;
+
+    function openSettings(idx) {
+        if (isRunning) stopRoutine();
+        currentEditIdx = idx;
+        const p = presets[idx];
+        
+        document.getElementById('modalTitle').innerText = `Konfiguracja Przycisk ${idx + 1}`;
+        document.getElementById('pauseInput').value = p.pause;
+        document.getElementById('timeInput').value = p.time;
+        document.getElementById('countInput').value = p.count;
+        
+        updateModalVals();
+        modalBackdrop.classList.add('active');
+    }
+
+    function updateModalVals() {
+        document.getElementById('pauseVal').innerText = document.getElementById('pauseInput').value + 's';
+        document.getElementById('timeVal').innerText = document.getElementById('timeInput').value + 's';
+        document.getElementById('countVal').innerText = document.getElementById('countInput').value;
+    }
+
+    function closeSettings() {
+        modalBackdrop.classList.remove('active');
+        currentEditIdx = null;
+    }
+
+    function saveSettings() {
+        if (currentEditIdx !== null) {
+            presets[currentEditIdx] = {
+                pause: parseInt(document.getElementById('pauseInput').value, 10),
+                time: parseInt(document.getElementById('timeInput').value, 10),
+                count: parseInt(document.getElementById('countInput').value, 10)
+            };
+            localStorage.setItem('timer_presets', JSON.stringify(presets));
+            updatePresetInfo();
+        }
+        closeSettings();
+    }
+
+    // Inicjalizacja startowa
+    updatePresetInfo();
+</script>
 
 </body>
 </html>
