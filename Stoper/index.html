@@ -2,186 +2,183 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Stoper Treningowy</title>
     <style>
         :root {
             --bg-color: #121212;
             --card-bg: #1e1e1e;
             --accent-color: #ff9800;
-            --text-color: #ffffff;
-            --text-dim: #b0b0b0;
-            --danger-color: #f44336;
             --success-color: #4caf50;
+            --danger-color: #f44336;
+            --text-color: #ffffff;
+            --subtext-color: #b0bec5;
         }
 
         * {
             box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
         }
 
         body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
             padding: 15px;
         }
 
-        .container {
+        /* Ekran licznika */
+        .display-card {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 500px;
+            border-radius: 20px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .status-label {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: var(--accent-color);
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+
+        .main-timer {
+            font-size: 80px;
+            font-weight: 900;
+            font-family: monospace, sans-serif;
+            line-height: 1;
+            margin: 5px 0;
+            color: var(--text-color);
+        }
+
+        .reps-counter {
+            font-size: 20px;
+            color: var(--subtext-color);
+            font-weight: 600;
+        }
+
+        /* Sekcja Przycisków */
+        .buttons-container {
             width: 100%;
             max-width: 500px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-        }
-
-        /* Display Panel */
-        .display-panel {
-            background-color: var(--card-bg);
-            border-radius: 16px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            gap: 10px;
+            flex-grow: 1;
             justify-content: center;
-            min-height: 180px;
-            border: 2px solid #2a2a2a;
         }
 
-        .status-label {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--accent-color);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 5px;
-        }
-
-        .main-timer {
-            font-size: 4rem;
-            font-weight: 800;
-            font-family: monospace;
-            line-height: 1;
-            margin: 10px 0;
-        }
-
-        .reps-counter {
-            font-size: 1.2rem;
-            color: var(--text-dim);
-        }
-
-        .reps-counter span {
-            color: var(--text-color);
-            font-weight: bold;
-        }
-
-        /* Buttons Grid */
-        .buttons-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .btn-card {
-            background-color: var(--card-bg);
-            border-radius: 12px;
+        .start-btn-group {
+            position: relative;
+            width: 100%;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 8px;
-            border: 1px solid #333;
         }
 
-        .start-btn {
-            flex: 1;
-            background-color: var(--accent-color);
-            color: #000;
+        .btn-start {
+            width: 100%;
+            height: 68px;
+            background: linear-gradient(135deg, #2e7d32, #1b5e20);
             border: none;
-            border-radius: 8px;
-            padding: 16px 10px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.1s, background-color 0.2s;
+            border-radius: 14px;
+            color: white;
+            padding: 5px 65px 5px 15px;
             display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
         }
 
-        .start-btn:active {
+        .btn-start:active {
             transform: scale(0.98);
+            background: linear-gradient(135deg, #1b5e20, #003300);
         }
 
-        .start-btn .preset-info {
-            font-size: 1.25rem;
-            font-weight: 800;
-            margin-top: 2px;
-            opacity: 1;
-            color: #000;
-            letter-spacing: 0.5px;
+        .btn-config {
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            text-align: left;
         }
 
-        .settings-btn {
-            background: none;
+        .btn-gear {
+            position: absolute;
+            right: 8px;
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 255, 255, 0.15);
             border: none;
-            color: var(--text-dim);
-            padding: 15px;
-            cursor: pointer;
+            border-radius: 12px;
+            color: white;
             display: flex;
-            align-items: center;
             justify-content: center;
-            transition: color 0.2s;
+            align-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
         }
 
-        .settings-btn:hover, .settings-btn:active {
-            color: var(--text-color);
-        }
-
-        .settings-btn svg {
-            width: 28px;
-            height: 28px;
+        .btn-gear svg {
+            width: 26px;
+            height: 26px;
             fill: currentColor;
         }
 
-        .stop-btn {
-            background-color: var(--danger-color);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 15px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-            display: none;
+        .btn-stop {
             width: 100%;
+            max-width: 500px;
+            height: 55px;
+            background: linear-gradient(135deg, #d32f2f, #b71c1c);
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: none;
         }
 
-        /* Modal / Settings Dialog */
+        /* Modal Ustawień */
         .modal-backdrop {
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.8);
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
             display: flex;
-            align-items: center;
             justify-content: center;
-            z-index: 100;
+            align-items: center;
+            z-index: 1000;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s ease;
         }
 
         .modal-backdrop.active {
@@ -193,337 +190,376 @@
             background: var(--card-bg);
             width: 90%;
             max-width: 400px;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            border: 1px solid #444;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
-        .modal-header {
-            font-size: 1.2rem;
-            font-weight: bold;
+        .modal-title {
+            font-size: 22px;
             margin-bottom: 20px;
+            text-align: center;
             color: var(--accent-color);
+            font-weight: bold;
         }
 
-        .setting-group {
+        .setting-row {
             margin-bottom: 20px;
         }
 
         .setting-label {
             display: flex;
             justify-content: space-between;
+            font-size: 16px;
             margin-bottom: 8px;
-            font-size: 0.95rem;
+            color: var(--subtext-color);
         }
 
-        .setting-label span.val {
+        .setting-value {
+            color: var(--text-color);
             font-weight: bold;
-            color: var(--accent-color);
         }
 
         input[type=range] {
             width: 100%;
-            height: 6px;
-            background: #444;
-            border-radius: 3px;
+            height: 8px;
+            border-radius: 4px;
+            background: #424242;
             outline: none;
-            accent-color: var(--accent-color);
+            -webkit-appearance: none;
         }
 
-        .modal-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .modal-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            font-weight: bold;
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent-color);
             cursor: pointer;
         }
 
-        .save-btn {
-            background: var(--accent-color);
-            color: #000;
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
         }
 
-        .cancel-btn {
-            background: #333;
-            color: var(--text-color);
+        .btn-modal {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
         }
+
+        .btn-save { background-color: var(--success-color); color: white; }
+        .btn-cancel { background-color: #424242; color: white; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="display-panel">
-        <div class="status-label" id="statusLabel">GOTOWY</div>
-        <div class="main-timer" id="mainTimer">00</div>
-        <div class="reps-counter" id="repsCounter">Powtórzenia: <span>0 / 0</span></div>
+    <!-- Główny Ekran Licznika -->
+    <div class="display-card">
+        <div style="font-size: 14px; font-weight: 700; color: var(--subtext-color); letter-spacing: 1px; margin-bottom: 2px;">CAŁKOWITY CZAS SESJI</div>
+        <div id="totalTimer" style="font-size: 28px; font-weight: 800; color: var(--accent-color); font-family: monospace; margin-bottom: 10px;">00:00</div>
+        <div id="statusLabel" class="status-label">GOTOWY</div>
+        <div id="mainTimer" class="main-timer">00</div>
+        <div id="repsCounter" class="reps-counter">Powtórzenia: 0 / 0</div>
     </div>
 
-    <div class="buttons-grid">
+    <!-- Przycisk Zatrzymania -->
+    <button id="stopBtn" class="btn-stop" onclick="stopRoutine()">ZATRZYMAJ</button>
+
+    <!-- Lista 5 Przycisków -->
+    <div class="buttons-container">
+        
         <!-- Przycisk 1 -->
-        <div class="btn-card">
-            <button class="start-btn" onclick="startRoutine(0)">
-                <div class="preset-info" id="info-0">Pauza: 2s | Czas: 10s | Ilość: 5</div>
+        <div class="start-btn-group">
+            <button class="btn-start" onclick="startRoutine(0)">
+                <div class="btn-config" id="config-0">30x 5s / 2s</div>
             </button>
-            <button class="settings-btn" onclick="openSettings(0)" aria-label="Ustawienia 1">
-                <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59-0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+            <button class="btn-gear" onclick="openSettings(0)" aria-label="Ustawienia 1">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
             </button>
         </div>
 
         <!-- Przycisk 2 -->
-        <div class="btn-card">
-            <button class="start-btn" onclick="startRoutine(1)">
-                <div class="preset-info" id="info-1">Pauza: 3s | Czas: 15s | Ilość: 10</div>
+        <div class="start-btn-group">
+            <button class="btn-start" onclick="startRoutine(1)">
+                <div class="btn-config" id="config-1">20x 10s / 2s</div>
             </button>
-            <button class="settings-btn" onclick="openSettings(1)" aria-label="Ustawienia 2">
-                <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59-0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+            <button class="btn-gear" onclick="openSettings(1)" aria-label="Ustawienia 2">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
             </button>
         </div>
 
         <!-- Przycisk 3 -->
-        <div class="btn-card">
-            <button class="start-btn" onclick="startRoutine(2)">
-                <div class="preset-info" id="info-2">Pauza: 5s | Czas: 30s | Ilość: 15</div>
+        <div class="start-btn-group">
+            <button class="btn-start" onclick="startRoutine(2)">
+                <div class="btn-config" id="config-2">6x 60s / 8s</div>
             </button>
-            <button class="settings-btn" onclick="openSettings(2)" aria-label="Ustawienia 3">
-                <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59-0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+            <button class="btn-gear" onclick="openSettings(2)" aria-label="Ustawienia 3">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
             </button>
+        </div>
+
+        <!-- Przycisk 4 -->
+        <div class="start-btn-group">
+            <button class="btn-start" onclick="startRoutine(3)">
+                <div class="btn-config" id="config-3">1x 60s / 3s</div>
+            </button>
+            <button class="btn-gear" onclick="openSettings(3)" aria-label="Ustawienia 4">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </button>
+        </div>
+
+        <!-- Przycisk 5 -->
+        <div class="start-btn-group">
+            <button class="btn-start" onclick="startRoutine(4)">
+                <div class="btn-config" id="config-4">30x 3s / 2s</div>
+            </button>
+            <button class="btn-gear" onclick="openSettings(4)" aria-label="Ustawienia 5">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Modal Konfiguracji -->
+    <div id="modalBackdrop" class="modal-backdrop">
+        <div class="modal">
+            <div id="modalTitle" class="modal-title">Konfiguracja Przycisk 1</div>
+            
+            <div class="setting-row">
+                <div class="setting-label"><span>Pauza (sekundy):</span> <span id="pauseVal" class="setting-value">2s</span></div>
+                <input type="range" id="pauseInput" min="1" max="10" value="2" oninput="updateModalVals()">
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label"><span>Czas (sekundy):</span> <span id="timeVal" class="setting-value">10s</span></div>
+                <input type="range" id="timeInput" min="5" max="60" value="10" oninput="updateModalVals()">
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label"><span>Ilość (powtórzenia):</span> <span id="countVal" class="setting-value">5</span></div>
+                <input type="range" id="countInput" min="1" max="50" value="5" oninput="updateModalVals()">
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-modal btn-cancel" onclick="closeSettings()">Anuluj</button>
+                <button class="btn-modal btn-save" onclick="saveSettings()">Zapisz</button>
+            </div>
         </div>
     </div>
 
-    <button class="stop-btn" id="stopBtn" onclick="stopRoutine()">ZATRZYMAJ</button>
-</div>
+    <script>
+        // Domyślne 5 ustawień według wytycznych
+        const defaultPresets = [
+            { count: 30, time: 5, pause: 2 },
+            { count: 20, time: 10, pause: 2 },
+            { count: 6, time: 60, pause: 8 },
+            { count: 1, time: 60, pause: 3 },
+            { count: 30, time: 3, pause: 2 }
+        ];
 
-<!-- Modal Ustawień -->
-<div class="modal-backdrop" id="modalBackdrop">
-    <div class="modal">
-        <div class="modal-header" id="modalTitle">Konfiguracja</div>
-        
-        <div class="setting-group">
-            <div class="setting-label">
-                <span>Pauza (1 - 10 s):</span>
-                <span class="val" id="pauseVal">2s</span>
-            </div>
-            <input type="range" id="pauseInput" min="1" max="10" value="2" oninput="updateModalVals()">
-        </div>
+        let presets = JSON.parse(localStorage.getItem('timer_presets_v2')) || defaultPresets;
 
-        <div class="setting-group">
-            <div class="setting-label">
-                <span>Czas ćwiczenia (5 - 60 s):</span>
-                <span class="val" id="timeVal">10s</span>
-            </div>
-            <input type="range" id="timeInput" min="5" max="60" value="10" oninput="updateModalVals()">
-        </div>
+        let isRunning = false;
+        let timerId = null;
+        let activePresetIdx = null;
 
-        <div class="setting-group">
-            <div class="setting-label">
-                <span>Ilość powtórzeń (3 - 50):</span>
-                <span class="val" id="countVal">5</span>
-            </div>
-            <input type="range" id="countInput" min="3" max="50" value="5" oninput="updateModalVals()">
-        </div>
+        // Licznik całkowitego czasu sesji
+        let totalSeconds = 0;
+        let totalTimerInterval = null;
 
-        <div class="modal-actions">
-            <button class="modal-btn cancel-btn" onclick="closeSettings()">Anuluj</button>
-            <button class="modal-btn save-btn" onclick="saveSettings()">Zapisz</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    // Konfiguracje domyślne lub wczytane z localStorage
-    let presets = JSON.parse(localStorage.getItem('timer_presets')) || [
-        { pause: 2, time: 10, count: 5 },
-        { pause: 3, time: 15, count: 10 },
-        { pause: 5, time: 30, count: 15 }
-    ];
-
-    let timerId = null;
-    let isRunning = false;
-    let activePresetIdx = null;
-
-    // Elementy interfejsu
-    const statusLabel = document.getElementById('statusLabel');
-    const mainTimer = document.getElementById('mainTimer');
-    const repsCounter = document.getElementById('repsCounter');
-    const stopBtn = document.getElementById('stopBtn');
-    const modalBackdrop = document.getElementById('modalBackdrop');
-
-    // Liczby słownie do syntezy mowy
-    const numbersInWords = [
-        "", "JEDEN", "DWA", "TRZY", "CZTERY", "PIĘĆ", "SZEŚĆ", "SIEDEM", "OSIEM", "DZIEWIĘĆ", "DZIESIĘĆ",
-        "JEDENASTACIE", "DWANASTACIE", "TRZYNASTACIE", "CZTERNASTACIE", "PIĘTNAŚCIE", "SZESNAŚCIE",
-        "SIEDEMNAŚCIE", "OSIEMNAŚCIE", "DZIEWIĘTNAŚCIE", "DWADZIEŚCIA", "DWADZIEŚCIA JEDEN", "DWADZIEŚCIA DWA",
-        "DWADZIEŚCIA TRZY", "DWADZIEŚCIA CZTERY", "DWADZIEŚCIA PIĘĆ", "DWADZIEŚCIA SZEŚĆ", "DWADZIEŚCIA SIEDEM",
-        "DWADZIEŚCIA OSIEM", "DWADZIEŚCIA DZIEWIĘĆ", "TRZYDZIEŚCI", "TRZYDZIEŚCI JEDEN", "TRZYDZIEŚCI DWA",
-        "TRZYDZIEŚCI TRZY", "TRZYDZIEŚCI CZTERY", "TRZYDZIEŚCI PIĘĆ", "TRZYDZIEŚCI SZEŚĆ", "TRZYDZIEŚCI SIEDEM",
-        "TRZYDZIEŚCI OSIEM", "TRZYDZIEŚCI DZIEWIĘĆ", "CZTERDZIEŚCI", "CZTERDZIEŚCI JEDEN", "CZTERDZIEŚCI DWA",
-        "CZTERDZIEŚCI TRZY", "CZTERDZIEŚCI CZTERY", "CZTERDZIEŚCI PIĘĆ", "CZTERDZIEŚCI SZEŚĆ", "CZTERDZIEŚCI SIEDEM",
-        "CZTERDZIEŚCI OSIEM", "CZTERDZIEŚCI DZIEWIĘĆ", "PIĘĆDZIESIĄT"
-    ];
-
-    function getNumberWord(n) {
-        return numbersInWords[n] || n.toString();
-    }
-
-    function updatePresetInfo() {
-        for (let i = 0; i < 3; i++) {
-            const p = presets[i];
-            document.getElementById(`info-${i}`).innerText = `Pauza: ${p.pause}s | Czas: ${p.time}s | Ilość: ${p.count}`;
+        function startTotalTimer() {
+            if (totalTimerInterval) return;
+            totalTimerInterval = setInterval(() => {
+                totalSeconds++;
+                const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+                const secs = (totalSeconds % 60).toString().padStart(2, '0');
+                const el = document.getElementById('totalTimer');
+                if (el) el.innerText = `${mins}:${secs}`;
+            }, 1000);
         }
-    }
 
-    function speak(text) {
-        if ('speechSynthesis' in window && text.trim() !== '') {
-            window.speechSynthesis.cancel(); // Przerwij poprzednie
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'pl-PL';
-            utterance.rate = 1.0;
-            window.speechSynthesis.speak(utterance);
+        // Słowniczek dla syntezy mowy (1 - 50)
+        const numberWords = {
+            1: "JEDEN", 2: "DWA", 3: "TRZY", 4: "CZTERY", 5: "PIĘĆ",
+            6: "SZEŚĆ", 7: "SIEDEM", 8: "OSIEM", 9: "DZIEWIĘĆ", 10: "DZIESIĘĆ",
+            11: "JEDENAŚCIE", 12: "DWANAŚCIE", 13: "TRZYNAŚCIE", 14: "CZTERNAŚCIE", 15: "PIĘTNAŚCIE",
+            16: "SZESNAŚCIE", 17: "SIEDEMNAŚCIE", 18: "OSIEMNAŚCIE", 19: "DZIEWIĘTNAŚCIE", 20: "DWADZIEŚCIA",
+            21: "DWADZIEŚCIA JEDEN", 22: "DWADZIEŚCIA DWA", 23: "DWADZIEŚCIA TRZY", 24: "DWADZIEŚCIA CZTERY", 25: "DWADZIEŚCIA PIĘĆ",
+            26: "DWADZIEŚCIA SZEŚĆ", 27: "DWADZIEŚCIA SIEDEM", 28: "DWADZIEŚCIA OSIEM", 29: "DWADZIEŚCIA DZIEWIĘĆ", 30: "TRZYDZIEŚCI",
+            31: "TRZYDZIEŚCI JEDEN", 32: "TRZYDZIEŚCI DWA", 33: "TRZYDZIEŚCI TRZY", 34: "TRZYDZIEŚCI CZTERY", 35: "TRZYDZIEŚCI PIĘĆ",
+            36: "TRZYDZIEŚCI SZEŚĆ", 37: "TRZYDZIEŚCI SIEDEM", 38: "TRZYDZIEŚCI OSIEM", 39: "TRZYDZIEŚCI DZIEWIĘĆ", 40: "CZTERDZIEŚCI",
+            41: "CZTERDZIEŚCI JEDEN", 42: "CZTERDZIEŚCI DWA", 43: "CZTERDZIEŚCI TRZY", 44: "CZTERDZIEŚCI CZTERY", 45: "CZTERDZIEŚCI PIĘĆ",
+            46: "CZTERDZIEŚCI SZEŚĆ", 47: "CZTERDZIEŚCI SIEDEM", 48: "CZTERDZIEŚCI OSIEM", 49: "CZTERDZIEŚCI DZIEWIĘĆ", 50: "PIĘĆDZIESIĄT"
+        };
+
+        // Elementy DOM
+        const statusLabel = document.getElementById('statusLabel');
+        const mainTimer = document.getElementById('mainTimer');
+        const repsCounter = document.getElementById('repsCounter');
+        const stopBtn = document.getElementById('stopBtn');
+        const modalBackdrop = document.getElementById('modalBackdrop');
+
+        function updatePresetInfo() {
+            presets.forEach((p, idx) => {
+                const el = document.getElementById(`config-${idx}`);
+                if (el) {
+                    el.innerText = `${p.count}x ${p.time}s / ${p.pause}s`;
+                }
+            });
         }
-    }
 
-    function delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
+        function getNumberWord(n) {
+            return numberWords[n] || n.toString();
+        }
 
-    // Główna logika odliczania
-    async function startRoutine(idx) {
-        if (isRunning) stopRoutine();
-
-        // Odblokuj Web Speech API na urządzeniach mobilnych
-        speak("");
-
-        isRunning = true;
-        activePresetIdx = idx;
-        const config = presets[idx];
-        
-        stopBtn.style.display = 'block';
-
-        for (let currentRep = 1; currentRep <= config.count; currentRep++) {
-            if (!isRunning) break;
-
-            // Faza PAUZY
-            statusLabel.innerText = "PAUZA";
-            statusLabel.style.color = "var(--accent-color)";
-            repsCounter.innerHTML = `Powtórzenia: <span>${currentRep} / ${config.count}</span>`;
-            
-            await countdown(config.pause);
-
-            if (!isRunning) break;
-
-            // Faza ĆWICZENIA
-            statusLabel.innerText = "ĆWICZENIE";
-            statusLabel.style.color = "var(--success-color)";
-            
-            await countdown(config.time);
-
-            if (!isRunning) break;
-
-            // Komunikat głosowy po wykonaniu czasu ćwiczenia
-            speak(getNumberWord(currentRep));
-
-            // Odczekaj dokładnie 2 sekundy przed słowem "KONIEC" po ostatnim powtórzeniu
-            if (currentRep === config.count) {
-                await delay(2000);
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'pl-PL';
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
             }
         }
 
-        if (isRunning) {
-            statusLabel.innerText = "KONIEC";
-            statusLabel.style.color = "var(--text-color)";
-            mainTimer.innerText = "00";
-            speak("KONIEC");
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Logika odliczania
+        async function startRoutine(idx) {
+            if (isRunning) stopRoutine();
+
+            // Odblokowanie mowy dla urządzeń mobilnych
+            speak("");
+
+            isRunning = true;
+            activePresetIdx = idx;
+            const config = presets[idx];
+            stopBtn.style.display = 'block';
+
+            for (let currentRep = 1; currentRep <= config.count; currentRep++) {
+                if (!isRunning) break;
+
+                // Faza PAUZY
+                statusLabel.innerText = "PAUZA";
+                statusLabel.style.color = "var(--accent-color)";
+                repsCounter.innerText = `Powtórzenia: ${currentRep} / ${config.count}`;
+                
+                await countdown(config.pause);
+                if (!isRunning) break;
+
+                // Faza ĆWICZENIA
+                statusLabel.innerText = "ĆWICZENIE";
+                statusLabel.style.color = "var(--success-color)";
+                
+                await countdown(config.time);
+                if (!isRunning) break;
+
+                // Wygłoszenie numeru powtórzenia
+                speak(getNumberWord(currentRep));
+
+                // Po ostatnim powtórzeniu odczekaj dokładnie 2 sekundy przed "KONIEC"
+                if (currentRep === config.count) {
+                    await delay(2000);
+                }
+            }
+
+            if (isRunning) {
+                statusLabel.innerText = "KONIEC";
+                statusLabel.style.color = "var(--text-color)";
+                mainTimer.innerText = "00";
+                speak("KONIEC");
+                isRunning = false;
+                stopBtn.style.display = 'none';
+            }
+        }
+
+        function countdown(seconds) {
+            return new Promise((resolve) => {
+                let left = seconds;
+                mainTimer.innerText = left.toString().padStart(2, '0');
+                
+                timerId = setInterval(() => {
+                    left--;
+                    if (left >= 0) {
+                        mainTimer.innerText = left.toString().padStart(2, '0');
+                    }
+                    if (left <= 0) {
+                        clearInterval(timerId);
+                        timerId = null;
+                        resolve();
+                    }
+                }, 1000);
+            });
+        }
+
+        function stopRoutine() {
             isRunning = false;
+            if (timerId) {
+                clearInterval(timerId);
+                timerId = null;
+            }
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            statusLabel.innerText = "ZATRZYMANO";
+            statusLabel.style.color = "var(--danger-color)";
+            mainTimer.innerText = "00";
             stopBtn.style.display = 'none';
         }
-    }
 
-    function countdown(seconds) {
-        return new Promise((resolve) => {
-            let left = seconds;
-            mainTimer.innerText = left.toString().padStart(2, '0');
+        // Modal Ustawień
+        let currentEditIdx = null;
 
-            timerId = setInterval(() => {
-                left--;
-                if (left >= 0) {
-                    mainTimer.innerText = left.toString().padStart(2, '0');
-                }
-                if (left <= 0) {
-                    clearInterval(timerId);
-                    timerId = null;
-                    resolve();
-                }
-            }, 1000);
-        });
-    }
-
-    function stopRoutine() {
-        isRunning = false;
-        if (timerId) {
-            clearInterval(timerId);
-            timerId = null;
+        function openSettings(idx) {
+            if (isRunning) stopRoutine();
+            currentEditIdx = idx;
+            const p = presets[idx];
+            
+            document.getElementById('modalTitle').innerText = `Konfiguracja Przycisk ${idx + 1}`;
+            document.getElementById('pauseInput').value = p.pause;
+            document.getElementById('timeInput').value = p.time;
+            document.getElementById('countInput').value = p.count;
+            
+            updateModalVals();
+            modalBackdrop.classList.add('active');
         }
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
+
+        function updateModalVals() {
+            document.getElementById('pauseVal').innerText = document.getElementById('pauseInput').value + 's';
+            document.getElementById('timeVal').innerText = document.getElementById('timeInput').value + 's';
+            document.getElementById('countVal').innerText = document.getElementById('countInput').value;
         }
-        statusLabel.innerText = "ZATRZYMANO";
-        statusLabel.style.color = "var(--danger-color)";
-        mainTimer.innerText = "00";
-        stopBtn.style.display = 'none';
-    }
 
-    // Modal Ustawień
-    let currentEditIdx = null;
-
-    function openSettings(idx) {
-        if (isRunning) stopRoutine();
-        currentEditIdx = idx;
-        const p = presets[idx];
-        
-        document.getElementById('modalTitle').innerText = `Konfiguracja Przycisk ${idx + 1}`;
-        document.getElementById('pauseInput').value = p.pause;
-        document.getElementById('timeInput').value = p.time;
-        document.getElementById('countInput').value = p.count;
-        
-        updateModalVals();
-        modalBackdrop.classList.add('active');
-    }
-
-    function updateModalVals() {
-        document.getElementById('pauseVal').innerText = document.getElementById('pauseInput').value + 's';
-        document.getElementById('timeVal').innerText = document.getElementById('timeInput').value + 's';
-        document.getElementById('countVal').innerText = document.getElementById('countInput').value;
-    }
-
-    function closeSettings() {
-        modalBackdrop.classList.remove('active');
-        currentEditIdx = null;
-    }
-
-    function saveSettings() {
-        if (currentEditIdx !== null) {
-            presets[currentEditIdx] = {
-                pause: parseInt(document.getElementById('pauseInput').value, 10),
-                time: parseInt(document.getElementById('timeInput').value, 10),
-                count: parseInt(document.getElementById('countInput').value, 10)
-            };
-            localStorage.setItem('timer_presets', JSON.stringify(presets));
-            updatePresetInfo();
+        function closeSettings() {
+            modalBackdrop.classList.remove('active');
+            currentEditIdx = null;
         }
-        closeSettings();
-    }
 
-    // Inicjalizacja startowa
-    updatePresetInfo();
-</script>
+        function saveSettings() {
+            if (currentEditIdx !== null) {
+                presets[currentEditIdx] = {
+                    pause: parseInt(document.getElementById('pauseInput').value, 10),
+                    time: parseInt(document.getElementById('timeInput').value, 10),
+                    count: parseInt(document.getElementById('countInput').value, 10)
+                };
+                localStorage.setItem('timer_presets_v2', JSON.stringify(presets));
+                updatePresetInfo();
+            }
+            closeSettings();
+        }
 
+        // Start inicjalizacyjny
+        updatePresetInfo();
+        startTotalTimer();
+    </script>
 </body>
 </html>
