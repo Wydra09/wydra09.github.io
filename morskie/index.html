@@ -33,8 +33,8 @@
 
         .board-container {
             width: 100%;
-            max-width: 98vw;
-            max-height: 88vh;
+            max-width: 96vw;
+            max-height: 82vh;
             aspect-ratio: 18 / 12;
             display: flex;
             align-items: center;
@@ -251,16 +251,16 @@
         const TEAM_RED = 'red';
 
         const SHIP_TYPES = {
-            BATTLESHIP: { key: 'BATTLESHIP', name: 'Pancernik', speed: 2, rank: 9, count: 3 },
-            MISSILE_SHIP: { key: 'MISSILE_SHIP', name: 'Okręt Rakietowy', speed: 1, rank: 8, count: 3 },
-            CRUISER: { key: 'CRUISER', name: 'Krążownik', speed: 2, rank: 7, count: 3 },
-            DESTROYER: { key: 'DESTROYER', name: 'Niszczyciel', speed: 4, rank: 6, count: 4 },
-            SUBMARINE: { key: 'SUBMARINE', name: 'Okręt Podwodny', speed: 2, rank: 5, count: 4 },
-            ESCORT: { key: 'ESCORT', name: 'Eskortowiec', speed: 3, rank: 4, count: 4 },
-            MINESWEEPER: { key: 'MINESWEEPER', name: 'Trałowiec', speed: 2, rank: 3, count: 4 },
-            LANDING_CRAFT: { key: 'LANDING_CRAFT', name: 'Okręt Desantowy', speed: 1, rank: 2, count: 1 },
-            COASTAL_BATTERY: { key: 'COASTAL_BATTERY', name: 'Bateria Nabrzeżna', speed: 0, rank: 10, count: 4 },
-            MINE: { key: 'MINE', name: 'Mina', speed: 0, rank: 1, count: 6 }
+            BATTLESHIP: { key: 'BATTLESHIP', name: 'Pancernik', speed: 2, strengthText: 'Ulega atakowi okrętu podwodnego', count: 3 },
+            MISSILE_SHIP: { key: 'MISSILE_SHIP', name: 'Okręt rakietowy', speed: 1, strengthText: 'Ulega atakowi pancernika i okrętu podwodnego', count: 3 },
+            CRUISER: { key: 'CRUISER', name: 'Krążownik', speed: 2, strengthText: 'Ulega atakowi pancernika, okrętu rakietowego i okrętu podwodnego', count: 3 },
+            DESTROYER: { key: 'DESTROYER', name: 'Niszczyciel', speed: 4, strengthText: 'Ulega atakowi pancernika, okrętu rakietowego, krążownika oraz okrętu podwodnego, jeżeli ten zaatakuje pierwszy', count: 4 },
+            SUBMARINE: { key: 'SUBMARINE', name: 'Okręt podwodny', speed: 2, strengthText: 'Ulega atakowi eskortowca oraz niszczyciela, jeżeli ten zaatakuje pierwszy', count: 4 },
+            ESCORT: { key: 'ESCORT', name: 'Eskortowiec', speed: 3, strengthText: 'Ulega atakowi wszystkich jednostek oprócz okrętu podwodnego i trałowca', count: 4 },
+            MINESWEEPER: { key: 'MINESWEEPER', name: 'Trałowiec', speed: 2, strengthText: 'Ulega atakowi wszystkich jednostek', count: 4 },
+            LANDING_CRAFT: { key: 'LANDING_CRAFT', name: 'Okręt desantowy', speed: 1, strengthText: 'Ulega atakowi wszystkich jednostek. Nie atakuje nikogo', count: 1 },
+            COASTAL_BATTERY: { key: 'COASTAL_BATTERY', name: 'Bateria nabrzeżna', speed: 0, strengthText: 'Bije wszystkie jednostki w zasięgu jednego pola, oprócz okrętu rakietowego, którego atakowi ulega', count: 4 },
+            MINE: { key: 'MINE', name: 'Mina', speed: 0, strengthText: 'Zaatakowana bije wszystkie jednostki oprócz trałowca jeżeli ten ogłosi: „Zdejmuję minę”', count: 6 }
         };
 
         const BATTERY_POSITIONS = [
@@ -442,9 +442,9 @@
                 let tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="py-2 px-2 font-bold">${st.name}</td>
-                    <td class="py-2 px-2 text-center">${st.speed}</td>
-                    <td class="py-2 px-2 text-center">${st.rank}</td>
-                    <td class="py-2 px-2 text-center">${st.count}</td>
+                    <td class="py-2 px-2 text-center">${st.speed > 0 ? st.speed : '-'}</td>
+                    <td class="py-2 px-2 leading-tight text-slate-300">${st.strengthText}</td>
+                    <td class="py-2 px-2 text-center font-bold">${st.count}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -498,6 +498,51 @@
             return pool;
         }
 
+        function renderSetupDock() {
+            const dockElem = document.getElementById('setup-dock');
+            if (!dockElem) return;
+            dockElem.innerHTML = '';
+
+            let grouped = {};
+            gameState.unplacedPool.forEach(piece => {
+                if (!grouped[piece.type]) {
+                    grouped[piece.type] = [];
+                }
+                grouped[piece.type].push(piece);
+            });
+
+            Object.keys(grouped).forEach(typeKey => {
+                let items = grouped[typeKey];
+                if (items.length === 0) return;
+
+                let row = document.createElement('div');
+                let isSelected = gameState.selectedDockPiece && gameState.selectedDockPiece.type === typeKey;
+
+                row.className = `flex items-center justify-between p-2 rounded cursor-pointer transition border ${
+                    isSelected 
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold' 
+                        : 'bg-slate-800/80 border-slate-700 hover:bg-slate-700/80 text-slate-200'
+                }`;
+
+                row.onclick = () => {
+                    gameState.selectedDockPiece = items[0];
+                    renderSetupDock();
+                };
+
+                row.innerHTML = `
+                    <span class="truncate">${SHIP_TYPES[typeKey].name}</span>
+                    <span class="ml-2 bg-slate-900 border border-slate-700 px-2 py-0.5 rounded-full text-[10px] font-mono text-amber-400">
+                        x${items.length}
+                    </span>
+                `;
+                dockElem.appendChild(row);
+            });
+
+            if (gameState.unplacedPool.length > 0 && !gameState.selectedDockPiece) {
+                gameState.selectedDockPiece = gameState.unplacedPool[0];
+            }
+        }
+
         function initGame() {
             let board = createInitialBoard();
             populateFleets(board);
@@ -508,18 +553,26 @@
                 selectedDockPiece: null,
                 unplacedPool: generateUnplacedPool(myRole),
                 validMoves: [],
-                board,
+                board: board,
                 winner: null
             };
-            renderBoard();
             renderSetupDock();
+            renderBoard();
             updateLayoutForRole();
         }
 
+        function isRestrictedMineCell(r, c) {
+            // Zabronione pola dla min: D3 (r:2, c:3), B10 (r:9, c:1), Q3 (r:2, c:16), O10 (r:9, c:14)
+            if (r === 2 && c === 3) return true;   // D3
+            if (r === 9 && c === 1) return true;   // B10
+            if (r === 2 && c === 16) return true;  // Q3
+            if (r === 9 && c === 14) return true;  // O10
+            return false;
+        }
+
         function isPortEntrance(r, c, team) {
-            // Wejścia do portów (kanały wyjściowe, gdzie NIE ma białych linii):
+            if (isRestrictedMineCell(r, c)) return true;
             if (team === TEAM_YELLOW) {
-                // Kanały wyjściowe u Żółtego: np. okolice D2, D4, B10 itp.
                 if ((r === 1 && c === 3) || (r === 3 && c === 3) || (r === 9 && c === 1) || (r === 10 && c === 2)) return true;
             } else {
                 if ((r === 1 && c === 15) || (r === 3 && c === 16) || (r === 8 && c === 14) || (r === 10 && c === 14)) return true;
@@ -616,120 +669,37 @@
                 }
             }
         }
-
-        function isBlockedByBorder(r1, c1, r2, c2) {
-            // Sprawdza czy przejście między (r1,c1) a (r2,c2) blokuje linia brzegowa portu
-            let c1Data = gameState.board[r1][c1];
-            let c2Data = gameState.board[r2][c2];
-
-            // Żółty port granice
-            if (c1Data.type === 'port-yellow' && c2Data.type === 'sea') {
-                if (r1 === 1 && c1 === 3 && r2 === 1 && c2 === 4) return true;
-                if (r1 === 3 && c1 === 3 && r2 === 3 && c2 === 4) return true;
-                if (r1 === 4 && c1 === 3 && r2 === 4 && c2 === 4) return true;
-                if (r1 === 5 && c1 === 1 && r2 === 5 && c2 === 2) return true;
-                if (r1 === 6 && c1 === 1 && r2 === 6 && c2 === 2) return true;
-                if (r1 === 7 && c1 === 1 && r2 === 7 && c2 === 2) return true;
-                if (r1 === 8 && c1 === 1 && r2 === 8 && c2 === 2) return true;
-                if (r1 === 10 && c1 === 2 && r2 === 10 && c2 === 3) return true;
-                if (r1 === 11 && c1 === 2 && r2 === 11 && c2 === 3) return true;
-            }
-            if (c1Data.type === 'sea' && c2Data.type === 'port-yellow') {
-                if (r2 === 1 && c2 === 3 && r1 === 1 && c1 === 4) return true;
-                if (r2 === 3 && c2 === 3 && r1 === 3 && c1 === 4) return true;
-                if (r2 === 4 && c2 === 3 && r1 === 4 && c1 === 4) return true;
-                if (r2 === 5 && c2 === 1 && r1 === 5 && c1 === 2) return true;
-                if (r2 === 6 && c2 === 1 && r1 === 6 && c1 === 2) return true;
-                if (r2 === 7 && c2 === 1 && r1 === 7 && c1 === 2) return true;
-                if (r2 === 8 && c2 === 1 && r1 === 8 && c1 === 2) return true;
-                if (r2 === 10 && c2 === 2 && r1 === 10 && c1 === 3) return true;
-                if (r2 === 11 && c2 === 2 && r1 === 11 && c1 === 3) return true;
-            }
-
-            // Czerwony port granice
-            if (c1Data.type === 'port-red' && c2Data.type === 'sea') {
-                if (r1 === 1 && c1 === 15 && r2 === 1 && c2 === 14) return true;
-                if (r1 === 3 && c1 === 16 && r2 === 3 && c2 === 15) return true;
-                if (r1 === 4 && c1 === 16 && r2 === 4 && c2 === 15) return true;
-                if (r1 === 5 && c1 === 16 && r2 === 5 && c2 === 15) return true;
-                if (r1 === 6 && c1 === 16 && r2 === 6 && c2 === 15) return true;
-                if (r1 === 7 && c1 === 14 && r2 === 7 && c2 === 13) return true;
-                if (r1 === 8 && c1 === 14 && r2 === 8 && c2 === 13) return true;
-                if (r1 === 10 && c1 === 14 && r2 === 10 && c2 === 13) return true;
-                if (r1 === 11 && c1 === 14 && r2 === 11 && c2 === 13) return true;
-            }
-            if (c1Data.type === 'sea' && c2Data.type === 'port-red') {
-                if (r2 === 1 && c2 === 15 && r1 === 1 && c1 === 14) return true;
-                if (r2 === 3 && c2 === 16 && r1 === 3 && c1 === 15) return true;
-                if (r2 === 4 && c2 === 16 && r1 === 4 && c1 === 15) return true;
-                if (r2 === 5 && c2 === 16 && r1 === 5 && c1 === 15) return true;
-                if (r2 === 6 && c2 === 16 && r1 === 6 && c1 === 15) return true;
-                if (r2 === 7 && c2 === 14 && r1 === 7 && c1 === 13) return true;
-                if (r2 === 8 && c2 === 14 && r1 === 8 && c1 === 13) return true;
-                if (r2 === 10 && c2 === 14 && r1 === 10 && c1 === 13) return true;
-                if (r2 === 11 && c2 === 14 && r1 === 11 && c1 === 13) return true;
-            }
-
-            return false;
-        }
-
-        function calculateValidMoves(startR, startC) {
-            let moves = [];
-            let piece = gameState.board[startR][startC].piece;
-            if (!piece) return moves;
-
-            let speed = SHIP_TYPES[piece.type].speed;
-            if (speed === 0) return moves;
-
-            const dirs = [{ r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 }];
-
-            dirs.forEach(d => {
-                let currR = startR;
-                let currC = startC;
-                for (let step = 1; step <= speed; step++) {
-                    let targetR = startR + d.r * step;
-                    let targetC = startC + d.c * step;
-
-                    if (targetR < 0 || targetR >= ROWS || targetC < 0 || targetC >= COLS) break;
-                    let targetCell = gameState.board[targetR][targetC];
-
-                    if (targetCell.type === 'island') break;
-                    if (isBlockedByBorder(currR, currC, targetR, targetC)) break;
-
-                    if (targetCell.piece) {
-                        if (targetCell.piece.team !== piece.team) {
-                            moves.push({ r: targetR, c: targetC, isAttack: true });
-                        }
-                        break;
-                    }
-
-                    moves.push({ r: targetR, c: targetC, isAttack: false });
-                    currR = targetR;
-                    currC = targetC;
-                }
-            });
-
-            return moves;
-        }
-
+<!-- ... existing code ... @@
         function handleCellClick(r, c) {
             let cell = gameState.board[r][c];
 
             if (gameState.phase === 'SETUP') {
                 let targetPort = myRole === TEAM_YELLOW ? 'port-yellow' : 'port-red';
-                if (cell.type === targetPort && !cell.piece && gameState.selectedDockPiece) {
-                    // Blokada min w wejściu do portu
-                    if (gameState.selectedDockPiece.type === 'MINE' && isPortEntrance(r, c, myRole)) {
-                        alert('Nie można ustawić miny w wejściu do portu!');
-                        return;
-                    }
-                    let idx = gameState.unplacedPool.findIndex(p => p.id === gameState.selectedDockPiece.id);
-                    if (idx !== -1) {
-                        cell.piece = gameState.unplacedPool.splice(idx, 1)[0];
-                        gameState.selectedDockPiece = gameState.unplacedPool[0] || null;
+                if (cell.type === targetPort) {
+                    // 1. Jeśli pole ma już nasz postawiony statek (nie baterię), zwracamy go do doku!
+                    if (cell.piece && cell.piece.team === myRole && cell.piece.type !== 'COASTAL_BATTERY') {
+                        gameState.unplacedPool.push(cell.piece);
+                        cell.piece = null;
                         renderSetupDock();
                         renderBoard();
                         syncNetwork();
+                        return;
+                    }
+
+                    // 2. Jeśli pole jest puste i mamy wybrany statek w doku, stawiamy go
+                    if (!cell.piece && gameState.selectedDockPiece) {
+                        if (gameState.selectedDockPiece.type === 'MINE' && isPortEntrance(r, c, myRole)) {
+                            alert('Nie można ustawić miny w tym miejscu (wejście/pole zastrzeżone)!');
+                            return;
+                        }
+                        let idx = gameState.unplacedPool.findIndex(p => p.id === gameState.selectedDockPiece.id);
+                        if (idx !== -1) {
+                            cell.piece = gameState.unplacedPool.splice(idx, 1)[0];
+                            gameState.selectedDockPiece = gameState.unplacedPool[0] || null;
+                            renderSetupDock();
+                            renderBoard();
+                            syncNetwork();
+                        }
                     }
                 }
                 return;
@@ -759,58 +729,7 @@
                 }
             }
         }
-
-        function executeMove(fromR, fromC, toR, toC) {
-            let sourceCell = gameState.board[fromR][fromC];
-            let targetCell = gameState.board[toR][toC];
-
-            let attacker = sourceCell.piece;
-            let defender = targetCell.piece;
-
-            if (!defender) {
-                targetCell.piece = attacker;
-            } else {
-                let attRank = SHIP_TYPES[attacker.type].rank;
-                let defRank = SHIP_TYPES[defender.type].rank;
-
-                if (attacker.type === 'MINESWEEPER' && defender.type === 'MINE') {
-                    targetCell.piece = attacker;
-                } else if (defender.type === 'MINE') {
-                    targetCell.piece = null;
-                } else if (attRank > defRank) {
-                    targetCell.piece = attacker;
-                    targetCell.piece.revealed = true;
-                } else if (attRank < defRank) {
-                    targetCell.piece = defender;
-                    targetCell.piece.revealed = true;
-                } else {
-                    targetCell.piece = null;
-                }
-            }
-
-            sourceCell.piece = null;
-            gameState.currentTurn = gameState.currentTurn === TEAM_YELLOW ? TEAM_RED : TEAM_YELLOW;
-            renderBoard();
-            syncNetwork();
-        }
-
-        function renderSetupDock() {
-            const dock = document.getElementById('setup-dock');
-            dock.innerHTML = '';
-            let groupCounts = {};
-            gameState.unplacedPool.forEach(p => groupCounts[p.type] = (groupCounts[p.type] || 0) + 1);
-
-            Object.keys(groupCounts).forEach(typeKey => {
-                let div = document.createElement('div');
-                div.className = 'flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800 cursor-pointer hover:border-amber-400';
-                div.innerHTML = `<span class="font-semibold">${SHIP_TYPES[typeKey].name}</span><span class="font-bold text-amber-400">${groupCounts[typeKey]}</span>`;
-                div.onclick = () => {
-                    gameState.selectedDockPiece = gameState.unplacedPool.find(p => p.type === typeKey);
-                };
-                dock.appendChild(div);
-            });
-        }
-
+<!-- ... existing code ... @@
         function randomizeSetup() {
             let pool = generateUnplacedPool(myRole).sort(() => Math.random() - 0.5);
             let portType = myRole === TEAM_YELLOW ? 'port-yellow' : 'port-red';
@@ -830,7 +749,7 @@
                 for (let c = 0; c < COLS; c++) {
                     let cell = gameState.board[r][c];
                     if (cell.type === portType && !cell.piece && idx < pool.length) {
-                        // Sprawdź czy to nie jest wejście dla miny
+                        // Sprawdź czy to nie jest wejście lub pole zastrzeżone dla miny
                         if (pool[idx].type === 'MINE' && isPortEntrance(r, c, myRole)) {
                             continue;
                         }
