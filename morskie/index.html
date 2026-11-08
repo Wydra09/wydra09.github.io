@@ -116,6 +116,9 @@
             border-radius: 50%;
             border: 2px solid #1e293b;
         }
+        .token-revealed {
+            box-shadow: 0 0 0 2.5px #38bdf8, 0 2px 4px rgba(0,0,0,0.45);
+        }
     </style>
 </head>
 <body class="flex flex-col h-[100dvh] w-screen overflow-hidden bg-slate-900">
@@ -613,12 +616,12 @@
             let validAttacks = new Set();
             let validMines = new Set();
 
-            if (phase === 'battle' && currentTurn === myColor && selectedCell && !pendingAction) {
+            if (phase === 'battle' && currentTurn === myColor && selectedCell) {
                 const unit = board[selectedCell];
                 if (unit && unit.owner === myColor) {
                     if (placingMineMode && unit.type === 'TR') {
                         validMines = getAdjacentMineCells(selectedCell);
-                    } else if (unit.type !== 'BN' && unit.type !== 'MN') {
+                    } else if (!pendingAction && unit.type !== 'BN' && unit.type !== 'MN') {
                         const res = getValidMovesAndAttacks(selectedCell, unit);
                         validMoves = res.moves;
                         validAttacks = res.attacks;
@@ -670,6 +673,7 @@
                         const token = document.createElement('div');
                         token.className = `unit-token ${unit.owner === 'yellow' ? 'token-yellow' : 'token-red'}`;
                         if (unit.type === 'BN') token.classList.add('token-battery');
+                        if (unit.revealed && unit.type !== 'BN') token.classList.add('token-revealed');
 
                         if (unit.owner === myColor || unit.revealed) {
                             token.textContent = unit.type;
@@ -779,6 +783,31 @@
                     return;
                 }
                 if (pendingAction) {
+                    if (placingMineMode && pendingAction.type === 'move' && board[pendingAction.to]?.type === 'TR') {
+                        const validMines = getAdjacentMineCells(pendingAction.to);
+                        if (validMines.has(coord)) {
+                            if (minesPlacedCount[myColor] >= 6) {
+                                showToast('Wykorzystałeś już wszystkie 6 min!');
+                                placingMineMode = false;
+                                renderBoard();
+                                return;
+                            }
+                            board[coord] = {
+                                id: `${myColor}-MN-${Date.now()}`,
+                                type: 'MN',
+                                owner: myColor,
+                                revealed: false,
+                                neutralTurns: 0
+                            };
+                            minesPlacedCount[myColor]++;
+                            pendingAction.minePlacedAfterMove = true;
+                            placingMineMode = false;
+                            showToast('Postawiono minę po ruchu! Kliknij Potwierdź, aby zakończyć turę.');
+                            renderBoard();
+                            updateUI();
+                            return;
+                        }
+                    }
                     showToast('Kliknij Potwierdź lub Anuluj swój ruch!');
                     return;
                 }
@@ -819,14 +848,15 @@
                                 type: attacks.has(coord) ? 'attack' : 'move',
                                 from: selectedCell,
                                 to: coord,
-                                snapshot: JSON.parse(JSON.stringify(board))
+                                snapshot: JSON.parse(JSON.stringify(board)),
+                                minePlacedAfterMove: false
                             };
                             // Podgląd lokalny ruchu
                             if (moves.has(coord)) {
                                 board[coord] = board[selectedCell];
                                 delete board[selectedCell];
                             }
-                            selectedCell = null;
+                            selectedCell = moves.has(coord) && board[coord]?.type === 'TR' ? coord : null;
                             renderBoard();
                             updateUI();
                             return;
@@ -978,14 +1008,27 @@
                     const nCoord = toCoord(nc, nr);
                     if (ISLAND_CELLS.has(nCoord)) break;
 
-                    // Sprawdź ściany (ruch po skosie nie może przeciąć rogu ściany)
+                    const target = board[nCoord];
+
+                    // Sprawdź ściany (ruch po skosie nie może przeciąć żadnego z 4 boków rogu)
+                    let wallBlocked = false;
                     if (dc !== 0 && dr !== 0) {
-                        if (isBlockedByWall(cc, cr, nc, cr) || isBlockedByWall(cc, cr, cc, nr)) break;
+                        wallBlocked = isBlockedByWall(cc, cr, nc, cr) || isBlockedByWall(cc, cr, cc, nr) ||
+                                      isBlockedByWall(nc, cr, nc, nr) || isBlockedByWall(cc, nr, nc, nr);
                     } else {
-                        if (isBlockedByWall(cc, cr, nc, nr)) break;
+                        wallBlocked = isBlockedByWall(cc, cr, nc, nr);
                     }
 
-                    const target = board[nCoord];
+                    // Wyjątek: Okręt rakietowy może zniszczyć Baterię nabrzeżną przez linię brzegową bez jej przekraczania
+                    if (wallBlocked) {
+                        if (unit.type === 'OR' && target && target.owner !== unit.owner && target.type === 'BN') {
+                            if (!NEUTRAL_CELLS.has(nCoord) && !NEUTRAL_CELLS.has(startCoord)) {
+                                attacks.add(nCoord);
+                            }
+                        }
+                        break;
+                    }
+
                     if (target) {
                         if (target.owner !== unit.owner) {
                             // Na wodach neutralnych nie można atakować
@@ -1053,16 +1096,25 @@
         // 7. POTWIERDZANIE / ANULOWANIE TURY
         // ==========================================
         document.getElementById('btn-place-mine').addEventListener('click', () => {
-            if (!selectedCell || board[selectedCell]?.type !== 'TR') return;
+            const trCoord = (pendingAction && pendingAction.type === 'move' && board[pendingAction.to]?.type === 'TR')
+                ? pendingAction.to
+                : selectedCell;
+            if (!trCoord || board[trCoord]?.type !== 'TR') return;
+            selectedCell = trCoord;
             placingMineMode = !placingMineMode;
             renderBoard();
+            updateUI();
         });
 
         document.getElementById('btn-cancel-turn').addEventListener('click', () => {
             if (!pendingAction) return;
+            if (pendingAction.minePlacedAfterMove) {
+                minesPlacedCount[myColor] = Math.max(0, minesPlacedCount[myColor] - 1);
+            }
             board = pendingAction.snapshot;
             pendingAction = null;
             selectedCell = null;
+            placingMineMode = false;
             renderBoard();
             updateUI();
         });
@@ -1070,14 +1122,21 @@
         document.getElementById('btn-confirm-turn').addEventListener('click', () => {
             if (!pendingAction) return;
             const act = pendingAction;
-            board = act.snapshot; // Przywróć czysty stan przed wykonaniem finalnej akcji
+            // Jeśli postawiono minę po ruchu, zachowaj ją na planszy; w przeciwnym razie przywróć czysty snapshot
+            if (!act.minePlacedAfterMove) {
+                board = act.snapshot;
+            }
             const playerLabel = myColor === 'yellow' ? 'Żółty' : 'Czerwony';
 
             if (act.type === 'move') {
-                const movedUnit = board[act.from];
-                board[act.to] = movedUnit;
-                delete board[act.from];
-                lastEventText = `${playerLabel} wykonał ruch.`;
+                if (!act.minePlacedAfterMove) {
+                    const movedUnit = board[act.from];
+                    board[act.to] = movedUnit;
+                    delete board[act.from];
+                }
+                lastEventText = act.minePlacedAfterMove
+                    ? `${playerLabel} wykonał ruch i postawił minę.`
+                    : `${playerLabel} wykonał ruch.`;
             } else if (act.type === 'attack') {
                 const att = board[act.from];
                 const def = board[act.to];
@@ -1086,9 +1145,15 @@
                 const result = resolveCombat(att, def);
 
                 if (result === 'attacker') {
-                    board[act.to] = att;
-                    delete board[act.from];
-                    lastEventText = `${playerLabel} (${UNIT_TYPES[att.type].name}) zniszczył: ${UNIT_TYPES[def.type].name}!`;
+                    if (def.type === 'BN') {
+                        // Okręt rakietowy niszczy baterię przez linię brzegową bez jej przekraczania
+                        delete board[act.to];
+                        lastEventText = `${playerLabel} (Okręt rakietowy) zniszczył Baterię nabrzeżną!`;
+                    } else {
+                        board[act.to] = att;
+                        delete board[act.from];
+                        lastEventText = `${playerLabel} (${UNIT_TYPES[att.type].name}) zniszczył: ${UNIT_TYPES[def.type].name}!`;
+                    }
                     showToast(lastEventText);
                 } else if (result === 'defender') {
                     delete board[act.from];
@@ -1308,7 +1373,7 @@
             if (selectedCell && board[selectedCell] && board[selectedCell].owner === myColor) {
                 const u = board[selectedCell];
                 const info = UNIT_TYPES[u.type];
-                badge.textContent = `${u.type} • ${selectedCell}`;
+                badge.textContent = `${u.type} • ${selectedCell}${u.revealed && u.type !== 'BN' ? ' • UJAWNIONY' : ''}`;
                 badge.className = `mb-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                     myColor === 'yellow' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-red-500/20 text-red-300'
                 }`;
@@ -1323,7 +1388,9 @@
                     neutralEl.classList.add('hidden');
                 }
 
-                if (phase === 'battle' && currentTurn === myColor && u.type === 'TR' && !pendingAction) {
+                const canPlaceMine = phase === 'battle' && currentTurn === myColor && u.type === 'TR' &&
+                    (!pendingAction || (pendingAction.type === 'move' && pendingAction.to === selectedCell && !pendingAction.minePlacedAfterMove));
+                if (canPlaceMine) {
                     mineBtn.disabled = false;
                     mineBtn.textContent = placingMineMode ? 'Anuluj minę' : `💣 Mina (${6 - minesPlacedCount[myColor]})`;
                 } else {
