@@ -58,8 +58,8 @@
             cursor: default;
         }
         @keyframes islandFlash {
-            0%, 100% { background-color: #ef4444; color: #ffffff; }
-            50% { background-color: #ffffff; color: #ef4444; }
+            0%, 100% { background-color: #22c55e; color: #ffffff; }
+            50% { background-color: #ffffff; color: #22c55e; }
         }
         .cell-island-active {
             animation: islandFlash 1s infinite;
@@ -856,6 +856,11 @@
                         break;
                     }
 
+                    // Sprawdź strefę rażenia wrogiej Baterii nabrzeżnej (zasięg 1 pola, blokuje wszystko oprócz OR)
+                    if (unit.type !== 'OR' && isInEnemyBatteryZone(next, unit.owner)) {
+                        break;
+                    }
+
                     if (target) {
                         if (target.owner !== unit.owner) {
                             // Na wodach neutralnych nie można atakować, a OD nie atakuje nikogo
@@ -880,6 +885,19 @@
             return { moves, attacks };
         }
 
+        function isInEnemyBatteryZone(coord, myOwner) {
+            const { cIdx, rIdx } = getCellCoords(coord);
+            for (let dc = -1; dc <= 1; dc++) {
+                for (let dr = -1; dr <= 1; dr++) {
+                    const neighbor = coordsToName(cIdx + dc, rIdx + dr);
+                    if (neighbor && board[neighbor] && board[neighbor].type === 'BN' && board[neighbor].owner !== myOwner) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         function getValidMineCells(fromCoord) {
             const cells = new Set();
             const start = getCellCoords(fromCoord);
@@ -902,8 +920,8 @@
             let validAttacks = new Set();
             let validMines = new Set();
 
-            if (phase === 'battle' && currentTurn === myColor && selectedCell && board[selectedCell] && board[selectedCell].owner === myColor) {
-                if (placingMineMode) {
+            if (phase === 'battle' && selectedCell && board[selectedCell] && board[selectedCell].owner === myColor) {
+                if (currentTurn === myColor && placingMineMode) {
                     validMines = getValidMineCells(selectedCell);
                 } else if (!pendingAction) {
                     const res = getValidMoves(selectedCell);
@@ -920,6 +938,9 @@
 
                     if (ISLAND_CELLS.has(coord)) {
                         cell.classList.add('cell-island');
+                        if (phase === 'battle' && currentTurn === myColor) {
+                            cell.classList.add('cell-island-active');
+                        }
                     } else if (NEUTRAL_CELLS.has(coord)) {
                         cell.classList.add('cell-neutral');
                     } else if (isYellowPort(coord)) {
@@ -999,7 +1020,20 @@
                 return;
             }
 
-            if (phase !== 'battle' || currentTurn !== myColor) return;
+            if (phase !== 'battle') return;
+
+            // Poza swoją turą można tylko podglądać swoje jednostki (info + zasięg ruchu)
+            if (currentTurn !== myColor) {
+                const clickedUnit = board[coord];
+                if (clickedUnit && clickedUnit.owner === myColor) {
+                    selectedCell = (selectedCell === coord) ? null : coord;
+                } else {
+                    selectedCell = null;
+                }
+                renderBoard();
+                updateUI();
+                return;
+            }
 
             // Tryb stawiania miny
             if (placingMineMode && selectedCell) {
@@ -1026,7 +1060,7 @@
                 }
             }
 
-            if (clickedUnit && clickedUnit.owner === myColor && clickedUnit.type !== 'BN' && clickedUnit.type !== 'MN') {
+            if (clickedUnit && clickedUnit.owner === myColor) {
                 selectedCell = (selectedCell === coord) ? null : coord;
                 renderBoard();
                 updateUI();
@@ -1366,7 +1400,7 @@
             }
 
             document.getElementById('btn-confirm-turn').disabled = !pendingAction;
-            document.getElementById('btn-cancel-turn').disabled = !pendingAction;
+            document.getElementById('btn-cancel-turn').disabled = !pendingAction || pendingAction.type === 'attack';
         }
 
         // ==========================================
