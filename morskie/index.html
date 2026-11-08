@@ -109,12 +109,6 @@
             border-radius: 50%;
             border: 2px solid #1e293b;
         }
-        .token-mine {
-            border-radius: 50%;
-            background: #1e293b !important;
-            color: #f8fafc !important;
-            border: 1.5px solid #94a3b8;
-        }
     </style>
 </head>
 <body class="flex flex-col h-[100dvh] w-screen overflow-hidden bg-slate-900">
@@ -208,17 +202,23 @@
             </div>
 
             <!-- Środek: Informacje o zaznaczonym statku -->
-            <div class="flex-1 my-2 bg-slate-900/70 border border-slate-700 rounded-lg p-2 flex flex-col justify-center items-center text-center">
-                <div id="selected-unit-badge" class="hidden mb-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase"></div>
-                <div id="selected-unit-name" class="text-sm sm:text-base font-extrabold text-white leading-tight">
-                    Wybierz jednostkę
+            <div class="flex-1 my-1.5 bg-slate-900/70 border border-slate-700 rounded-lg p-1.5 sm:p-2 flex flex-col justify-between items-center text-center overflow-hidden">
+                <div class="flex-1 flex flex-col justify-center items-center w-full">
+                    <div id="selected-unit-badge" class="hidden mb-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase"></div>
+                    <div id="selected-unit-name" class="text-xs sm:text-sm font-extrabold text-white leading-tight">
+                        Wybierz jednostkę
+                    </div>
+                    <div id="selected-unit-desc" class="text-[10px] sm:text-xs text-slate-400 mt-1 leading-snug">
+                        Kliknij swój statek na planszy, aby zobaczyć jego ruch i siłę.
+                    </div>
+                    <div id="neutral-warning" class="hidden mt-1 px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] font-bold"></div>
+                    <button id="btn-place-mine" class="hidden mt-1.5 w-full py-1 px-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-[11px] shadow transition">
+                        💣 Stawiam minę
+                    </button>
                 </div>
-                <div id="selected-unit-desc" class="text-[10px] sm:text-xs text-slate-400 mt-1 leading-snug">
-                    Kliknij swój statek na planszy, aby zobaczyć jego ruch i siłę.
+                <div id="last-event-box" class="w-full mt-1.5 pt-1.5 border-t border-slate-700/80 text-[10px] text-sky-300 leading-tight min-h-[28px] flex items-center justify-center">
+                    Brak zdarzeń
                 </div>
-                <button id="btn-place-mine" class="hidden mt-2 w-full py-1.5 px-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shadow transition">
-                    💣 Stawiam minę
-                </button>
             </div>
 
             <!-- Dół: Przyciski Potwierdź i Anuluj -->
@@ -382,7 +382,9 @@
         let placingMineMode = false;
 
         // Buforowany ruch przed kliknięciem [Potwierdź]
-        let pendingAction = null; // { type: 'move'|'attack'|'mine', from, to, snapshotBoard }
+        let pendingAction = null; // { type: 'move'|'attack', from, to, snapshotBoard }
+        let lastEventText = 'Bitwa rozpoczęta!';
+        let minesPlacedCount = { yellow: 0, red: 0 };
 
         // ==========================================
         // 3. INICJALIZACJA P2P (PEERJS)
@@ -464,7 +466,7 @@
         }
         function isRedPort(c, r) {
             if (c >= 16) return true;
-            if (c === 15 && (r <= 2 || r >= 7)) return true;
+            if (c === 15 && (r <= 1 || r >= 7)) return true;
             if (c === 14 && r >= 7) return true;
             return false;
         }
@@ -531,6 +533,12 @@
 
                     if (ISLAND_CELLS.has(coord)) {
                         cell.classList.add('cell-island');
+                        if (phase === 'battle' && currentTurn === myColor) {
+                            const pulse = document.createElement('span');
+                            pulse.className = 'text-[8px] sm:text-[10px] font-black text-white animate-pulse text-center leading-none pointer-events-none drop-shadow';
+                            pulse.textContent = (coord === 'I6' || coord === 'J6') ? 'TWOJA' : 'TURA';
+                            cell.appendChild(pulse);
+                        }
                     } else if (NEUTRAL_CELLS.has(coord)) {
                         cell.classList.add('cell-neutral');
                     } else if (isYellowPort(c, r)) {
@@ -559,7 +567,6 @@
                         const token = document.createElement('div');
                         token.className = `unit-token ${unit.owner === 'yellow' ? 'token-yellow' : 'token-red'}`;
                         if (unit.type === 'BN') token.classList.add('token-battery');
-                        if (unit.type === 'MN') token.classList.add('token-mine');
 
                         if (unit.owner === myColor || unit.revealed) {
                             token.textContent = unit.type;
@@ -667,12 +674,12 @@
                     if (placingMineMode && myUnit && myUnit.type === 'TR') {
                         const validMines = getAdjacentMineCells(selectedCell);
                         if (validMines.has(coord)) {
-                            pendingAction = {
-                                type: 'mine',
-                                from: selectedCell,
-                                to: coord,
-                                snapshot: JSON.parse(JSON.stringify(board))
-                            };
+                            if (minesPlacedCount[myColor] >= 6) {
+                                showToast('Wykorzystałeś już wszystkie 6 min!');
+                                placingMineMode = false;
+                                renderBoard();
+                                return;
+                            }
                             board[coord] = {
                                 id: `${myColor}-MN-${Date.now()}`,
                                 type: 'MN',
@@ -680,8 +687,11 @@
                                 revealed: false,
                                 neutralTurns: 0
                             };
+                            minesPlacedCount[myColor]++;
                             placingMineMode = false;
-                            selectedCell = null;
+                            lastEventText = `${myColor === 'yellow' ? 'Żółty' : 'Czerwony'} postawił minę (nie liczy się za ruch).`;
+                            showToast('Postawiono minę! Możesz teraz wykonać ruch.');
+                            sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount });
                             renderBoard();
                             updateUI();
                             return;
@@ -945,19 +955,13 @@
             if (!pendingAction) return;
             const act = pendingAction;
             board = act.snapshot; // Przywróć czysty stan przed wykonaniem finalnej akcji
+            const playerLabel = myColor === 'yellow' ? 'Żółty' : 'Czerwony';
 
-            if (act.type === 'mine') {
-                board[act.to] = {
-                    id: `${myColor}-MN-${Date.now()}`,
-                    type: 'MN',
-                    owner: myColor,
-                    revealed: false,
-                    neutralTurns: 0
-                };
-                showToast('Postawiono minę!');
-            } else if (act.type === 'move') {
-                board[act.to] = board[act.from];
+            if (act.type === 'move') {
+                const movedUnit = board[act.from];
+                board[act.to] = movedUnit;
                 delete board[act.from];
+                lastEventText = `${playerLabel} wykonał ruch.`;
                 updateNeutralTurns(act.to);
             } else if (act.type === 'attack') {
                 const att = board[act.from];
@@ -969,14 +973,17 @@
                 if (result === 'attacker') {
                     board[act.to] = att;
                     delete board[act.from];
-                    showToast(`Wygrana! ${UNIT_TYPES[att.type].name} niszczy ${UNIT_TYPES[def.type].name}.`);
+                    lastEventText = `${playerLabel} (${UNIT_TYPES[att.type].name}) zniszczył: ${UNIT_TYPES[def.type].name}!`;
+                    showToast(lastEventText);
                 } else if (result === 'defender') {
                     delete board[act.from];
-                    showToast(`Porażka! ${UNIT_TYPES[att.type].name} ulega ${UNIT_TYPES[def.type].name}.`);
+                    lastEventText = `${playerLabel} (${UNIT_TYPES[att.type].name}) uległ jednostce: ${UNIT_TYPES[def.type].name}!`;
+                    showToast(lastEventText);
                 } else {
                     delete board[act.from];
                     delete board[act.to];
-                    showToast(`Remis! Obie jednostki (${UNIT_TYPES[att.type].name} i ${UNIT_TYPES[def.type].name}) toną.`);
+                    lastEventText = `Remis! ${UNIT_TYPES[att.type].name} i ${UNIT_TYPES[def.type].name} toną.`;
+                    showToast(lastEventText);
                 }
             }
 
@@ -984,7 +991,7 @@
             selectedCell = null;
             currentTurn = currentTurn === 'yellow' ? 'red' : 'yellow';
 
-            sendData({ type: 'SYNC_BOARD', board, currentTurn });
+            sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount });
             checkWinConditions();
             renderBoard();
             updateUI();
@@ -997,7 +1004,8 @@
                 u.neutralTurns = (u.neutralTurns || 0) + 1;
                 if (u.neutralTurns >= 4) {
                     delete board[coord];
-                    showToast(`${UNIT_TYPES[u.type].name} został internowany na wodach neutralnych!`);
+                    lastEventText = `${UNIT_TYPES[u.type].name} został internowany na wodach neutralnych!`;
+                    showToast(lastEventText);
                 }
             } else {
                 u.neutralTurns = 0;
@@ -1047,6 +1055,8 @@
             } else if (data.type === 'SYNC_BOARD') {
                 board = data.board;
                 currentTurn = data.currentTurn;
+                if (data.lastEvent) lastEventText = data.lastEvent;
+                if (data.minesPlacedCount) minesPlacedCount = data.minesPlacedCount;
                 checkWinConditions();
                 renderBoard();
                 updateUI();
@@ -1076,6 +1086,10 @@
             const descEl = document.getElementById('selected-unit-desc');
             const badgeEl = document.getElementById('selected-unit-badge');
             const mineBtn = document.getElementById('btn-place-mine');
+            const neutralWarn = document.getElementById('neutral-warning');
+            const eventBox = document.getElementById('last-event-box');
+
+            eventBox.textContent = lastEventText;
 
             if (selectedCell && board[selectedCell]) {
                 const u = board[selectedCell];
@@ -1088,13 +1102,22 @@
                 nameEl.textContent = info.name;
                 descEl.textContent = info.desc;
 
+                if (NEUTRAL_CELLS.has(selectedCell)) {
+                    neutralWarn.classList.remove('hidden');
+                    neutralWarn.textContent = `⚠️ Wody neutralne: tura ${u.neutralTurns || 0}/3`;
+                } else {
+                    neutralWarn.classList.add('hidden');
+                }
+
                 if (u.type === 'TR' && u.owner === myColor && currentTurn === myColor && !pendingAction) {
                     mineBtn.classList.remove('hidden');
+                    mineBtn.textContent = `💣 Stawiam minę (${6 - minesPlacedCount[myColor]}/6)`;
                 } else {
                     mineBtn.classList.add('hidden');
                 }
             } else {
                 badgeEl.classList.add('hidden');
+                neutralWarn.classList.add('hidden');
                 nameEl.textContent = pendingAction ? 'Ruch gotowy' : 'Wybierz jednostkę';
                 descEl.textContent = pendingAction
                     ? 'Kliknij Potwierdź, aby zakończyć turę, lub Anuluj, aby cofnąć.'
