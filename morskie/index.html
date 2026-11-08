@@ -410,6 +410,30 @@
         // ==========================================
         // 3. INICJALIZACJA P2P (PEERJS)
         // ==========================================
+        const PEER_CONFIG = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    {
+                        urls: 'turn:openrelay.metered.ca:80',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    },
+                    {
+                        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ]
+            }
+        };
+
         const btnCreateRoom = document.getElementById('btn-create-room');
         const btnJoinRoom = document.getElementById('btn-join-room');
         const inputRoomCode = document.getElementById('input-room-code');
@@ -428,7 +452,7 @@
             document.getElementById('lobby-waiting').classList.remove('hidden');
             document.getElementById('display-room-code').textContent = code;
 
-            peer = new Peer(peerId);
+            peer = new Peer(peerId, PEER_CONFIG);
             peer.on('connection', (c) => {
                 conn = c;
                 setupConnection();
@@ -450,9 +474,9 @@
             }
             roomCodeGlobal = code;
             myColor = 'red';
-            peer = new Peer();
+            peer = new Peer(PEER_CONFIG);
             peer.on('open', () => {
-                conn = peer.connect(`manewry-morskie-${code}`);
+                conn = peer.connect(`manewry-morskie-${code}`, { reliable: true });
                 setupConnection();
             });
             peer.on('error', (err) => {
