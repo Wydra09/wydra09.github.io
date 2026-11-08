@@ -412,6 +412,7 @@
         // ==========================================
         const PEER_CONFIG = {
             config: {
+                iceCandidatePoolSize: 10,
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
@@ -426,7 +427,7 @@
                         credential: 'openrelayproject'
                     },
                     {
-                        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                        urls: 'turns:openrelay.metered.ca:443?transport=tcp',
                         username: 'openrelayproject',
                         credential: 'openrelayproject'
                     }
@@ -476,8 +477,14 @@
             myColor = 'red';
             peer = new Peer(PEER_CONFIG);
             peer.on('open', () => {
+                showToast('Łączenie z pokojem...');
                 conn = peer.connect(`manewry-morskie-${code}`, { reliable: true });
                 setupConnection();
+                setTimeout(() => {
+                    if (phase === 'lobby' && (!conn || !conn.open)) {
+                        showToast('Sieć 5G blokuje bezpośrednie połączenie (TURN nie odpowiada). Spróbuj ponownie lub użyj Wi-Fi.');
+                    }
+                }, 10000);
             });
             peer.on('error', (err) => {
                 showToast('Nie można dołączyć: ' + err.type);
