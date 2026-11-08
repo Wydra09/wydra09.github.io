@@ -187,28 +187,30 @@
         <!-- PRAWA STRONA: PANEL INFORMACYJNY -->
         <div id="info-panel" class="w-36 sm:w-48 md:w-56 h-full max-h-full bg-slate-800 border border-slate-700 rounded-xl p-1.5 sm:p-2 flex flex-col justify-between shrink-0 shadow-xl overflow-hidden">
             
-            <!-- Góra: Status połączenia i tury -->
-            <div class="space-y-1.5">
-                <button id="btn-sync-status" onclick="forceSync()" title="Kliknij, aby odświeżyć połączenie" class="w-full flex items-center justify-between bg-slate-900/80 hover:bg-slate-900 px-2 py-1 rounded-lg border border-slate-700 transition">
-                    <span class="text-[10px] text-slate-400 font-semibold">Status (🔄):</span>
-                    <span id="conn-status" class="text-[10px] font-bold text-emerald-400">Połączono</span>
+            <!-- Góra: Układ 2x3 (Status | Tura, Odczyt | Zapis, Zasady | Tabela) -->
+            <div class="grid grid-cols-2 gap-1 shrink-0">
+                <button id="btn-sync-status" onclick="forceSync()" title="Kliknij, aby odświeżyć połączenie" class="py-1.5 px-1 rounded-lg bg-slate-900/90 hover:bg-slate-900 border border-slate-700 flex items-center justify-center transition">
+                    <span id="conn-status" class="text-[10px] font-bold text-emerald-400 truncate">Połączono</span>
                 </button>
 
-                <div id="turn-indicator" class="w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs bg-slate-700 text-white border border-slate-600">
-                    Faza ustawiania
+                <div id="turn-indicator" class="py-1.5 px-1 rounded-lg text-center font-extrabold text-[10px] sm:text-xs bg-slate-700 text-white border border-slate-600 flex items-center justify-center truncate">
+                    Ustawianie
                 </div>
 
-                <div class="grid grid-cols-3 gap-1">
-                    <button onclick="openModal('modal-rules')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] font-bold text-sky-300 transition">
-                        📖 Zasady
-                    </button>
-                    <button onclick="openModal('modal-table')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] font-bold text-amber-300 transition">
-                        📊 Tabela
-                    </button>
-                    <button onclick="openModal('modal-save')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] font-bold text-emerald-300 transition">
-                        💾 Zapis
-                    </button>
-                </div>
+                <button onclick="document.getElementById('input-load-save').click()" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] sm:text-xs font-bold text-sky-300 transition">
+                    📂 Odczyt
+                </button>
+                <button onclick="exportGameState()" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] sm:text-xs font-bold text-emerald-300 transition">
+                    💾 Zapis
+                </button>
+                <input id="input-load-save" type="file" accept=".json" onchange="importGameState(event)" class="hidden">
+
+                <button onclick="openModal('modal-rules')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] sm:text-xs font-bold text-slate-200 transition">
+                    📖 Zasady
+                </button>
+                <button onclick="openModal('modal-table')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] sm:text-xs font-bold text-amber-300 transition">
+                    📊 Tabela
+                </button>
             </div>
 
             <!-- Środek: Informacje o zaznaczonym statku -->
@@ -276,23 +278,23 @@
                         <tr class="border-b border-slate-600 text-slate-400">
                             <th class="py-2 px-1">Jednostka (Inicjał)</th>
                             <th class="py-2 px-1 text-center">Ruch</th>
-    <!-- MODAL: ZAPIS / WCZYTYWANIE GRY -->
-    <div id="modal-save" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-        <div class="bg-slate-800 border border-slate-600 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
-                <h2 class="text-base font-extrabold text-emerald-400">Zapis i Wczytywanie Gry</h2>
-                <button onclick="closeModal('modal-save')" class="text-slate-400 hover:text-white text-xl font-bold px-2">&times;</button>
-            </div>
-            <p class="text-xs text-slate-300 leading-relaxed">
-                Możesz zapisać aktualny stan bitwy do pliku na telefonie i wczytać go później po ponownym połączeniu z drugim graczem.
-            </p>
-            <button onclick="exportGameState()" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition">
-                ⬇️ Pobierz zapis gry (.json)
-            </button>
-            <div class="border-t border-slate-700 pt-3">
-                <label class="block text-xs font-bold text-slate-300 mb-1.5">Wczytaj zapis z pliku:</label>
-                <input id="input-load-save" type="file" accept=".json" onchange="importGameState(event)"
-                    class="w-full text-xs text-slate-300 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-500 cursor-pointer">
+                            <th class="py-2 px-1">Siła i zasady walki</th>
+                            <th class="py-2 px-1 text-center">Ilość</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700 text-slate-200">
+                        <tr><td class="py-1.5 px-1 font-bold">Pancernik (PN)</td><td class="text-center">2</td><td>Ulega tylko Okrętowi podwodnemu</td><td class="text-center">3</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Okręt rakietowy (OR)</td><td class="text-center">1</td><td>Ulega PN i OP. Niszczy Baterie nabrzeżne</td><td class="text-center">3</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Krążownik (KR)</td><td class="text-center">2</td><td>Ulega PN, OR i OP</td><td class="text-center">3</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Niszczyciel (NI)</td><td class="text-center">4</td><td>Ulega PN, OR, KR oraz OP (gdy OP atakuje pierwszy)</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Okręt podwodny (OP)</td><td class="text-center">2</td><td>Ulega ES oraz NI (gdy NI atakuje pierwszy)</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Eskortowiec (ES)</td><td class="text-center">3</td><td>Ulega wszystkim oprócz OP i TR</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Trałowiec (TR)</td><td class="text-center">2</td><td>Ulega wszystkim. Stawia i usuwa Miny</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Okręt desantowy (OD)</td><td class="text-center">1</td><td>Ulega wszystkim. Nie atakuje nikogo</td><td class="text-center">1</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Bateria nabrzeżna (BN)</td><td class="text-center">—</td><td>Bije wszystko w zasięgu 1 pola oprócz OR</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Mina (MN)</td><td class="text-center">—</td><td>Zaatakowana bije wszystko oprócz TR</td><td class="text-center">6</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -1234,7 +1236,6 @@
             a.click();
             URL.revokeObjectURL(url);
             showToast('Zapisano stan gry!');
-            closeModal('modal-save');
         }
         window.exportGameState = exportGameState;
 
@@ -1264,10 +1265,11 @@
                     sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
                     renderBoard();
                     updateUI();
-                    closeModal('modal-save');
                     showToast('Wczytano i zsynchronizowano stan gry!');
                 } catch (err) {
                     showToast('Błąd odczytu pliku zapisu!');
+                } finally {
+                    event.target.value = '';
                 }
             };
             reader.readAsText(file);
