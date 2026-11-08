@@ -1189,7 +1189,7 @@
                 enemyReady = true;
                 checkBothReady();
             } else if (data.type === 'SYNC_BOARD') {
-                if (typeof data.turnNumber === 'number' && data.turnNumber < turnNumber) {
+                if (!data.force && typeof data.turnNumber === 'number' && data.turnNumber < turnNumber) {
                     return;
                 }
                 board = data.board;
@@ -1197,9 +1197,12 @@
                 if (typeof data.turnNumber === 'number') turnNumber = data.turnNumber;
                 if (data.lastEvent) lastEventText = data.lastEvent;
                 if (data.minesPlacedCount) minesPlacedCount = data.minesPlacedCount;
+                pendingAction = null;
+                selectedCell = null;
                 checkWinConditions();
                 renderBoard();
                 updateUI();
+                if (data.force) showToast('Przeciwnik wczytał zapisany stan gry!');
             } else if (data.type === 'HEARTBEAT') {
                 if (phase === 'battle') {
                     if (data.turnNumber < turnNumber) {
@@ -1262,7 +1265,7 @@
                     selectedCell = null;
 
                     document.getElementById('dock-overlay').classList.add('hidden');
-                    sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
+                    sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber, force: true });
                     renderBoard();
                     updateUI();
                     showToast('Wczytano i zsynchronizowano stan gry!');
@@ -1282,12 +1285,12 @@
         function updateUI() {
             const turnInd = document.getElementById('turn-indicator');
             if (phase === 'setup') {
-                turnInd.textContent = myReady ? 'Czekam na wroga...' : 'Faza ustawiania';
-                turnInd.className = 'w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs bg-slate-700 text-white border border-slate-600';
+                turnInd.textContent = myReady ? 'Czekam...' : 'Ustawianie';
+                turnInd.className = 'py-1.5 px-1 rounded-lg text-center font-extrabold text-[10px] sm:text-xs bg-slate-700 text-white border border-slate-600 flex items-center justify-center whitespace-nowrap truncate';
             } else if (phase === 'battle') {
                 const isMyTurn = currentTurn === myColor;
-                turnInd.textContent = isMyTurn ? 'TWOJA TURA' : 'TURA WROGA';
-                turnInd.className = `w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs border ${
+                turnInd.textContent = isMyTurn ? 'Twoja tura' : 'Przeciwnik';
+                turnInd.className = `py-1.5 px-1 rounded-lg text-center font-extrabold text-[10px] sm:text-xs border flex items-center justify-center whitespace-nowrap truncate ${
                     isMyTurn
                         ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500'
                         : 'bg-rose-600/30 text-rose-300 border-rose-500'
