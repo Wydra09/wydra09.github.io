@@ -3,751 +3,636 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Manewry Morskie - Online</title>
-    <!-- Tailwind CSS -->
+    <title>Manewry Morskie Online</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PeerJS for WebRTC P2P multiplayer -->
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <!-- FontAwesome for crisp icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
         }
-
         html, body {
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100dvh;
+            height: 100%;
             overflow: hidden;
             font-family: 'Inter', sans-serif;
             background-color: #0f172a;
             color: #f8fafc;
         }
-
-        /* Board Grid: 18 columns x 12 rows, always fitting the viewport */
-        #game-wrapper {
-            width: 100vw;
-            height: 100dvh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 4px;
-            background: #0b1120;
-        }
-
-        #board-container {
-            position: relative;
+        /* Siatka 18x12 rozciągnięta na dostępną przestrzeń */
+        #board-grid {
+            display: grid;
+            grid-template-columns: repeat(18, minmax(0, 1fr));
+            grid-template-rows: repeat(12, minmax(0, 1fr));
             width: 100%;
             height: 100%;
-            max-width: calc(100dvh * 1.5);
-            max-height: calc(100vw / 1.5);
-            aspect-ratio: 18 / 12;
-            display: grid;
-            grid-template-columns: repeat(18, 1fr);
-            grid-template-rows: repeat(12, 1fr);
-            border: 2px solid #334155;
-            border-radius: 6px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            border: 2px solid #1e293b;
+            background-color: #0284c7;
         }
-
         .cell {
             position: relative;
-            border: 0.5px solid rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(15, 23, 42, 0.35);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: background-color 0.15s ease;
+            transition: background-color 0.15s;
         }
-
-        /* Terrain colors */
-        .terrain-sea {
-            background-color: #1d70b8;
-        }
-        .terrain-yellow-port {
-            background-color: #eab308;
-        }
-        .terrain-red-port {
-            background-color: #dc2626;
-        }
-        .terrain-neutral {
-            background-color: #1d70b8;
-            background-image: radial-gradient(#0f172a 18%, transparent 19%);
+        .cell-port-yellow { background-color: #facc15; }
+        .cell-port-red { background-color: #ef4444; }
+        .cell-sea { background-color: #0284c7; }
+        .cell-neutral {
+            background-color: #0284c7;
+            background-image: radial-gradient(#0f172a 1.2px, transparent 1.2px);
             background-size: 6px 6px;
         }
-        .terrain-island {
-            background-color: #16a34a;
-            border: 1px solid #ffffff;
-            cursor: pointer;
+        .cell-island {
+            background-color: #22c55e;
+            cursor: default;
         }
+        /* Linie brzegowe (białe grube krawędzie) */
+        .wall-right { border-right: 3px solid #ffffff !important; }
+        .wall-left { border-left: 3px solid #ffffff !important; }
+        .wall-top { border-top: 3px solid #ffffff !important; }
+        .wall-bottom { border-bottom: 3px solid #ffffff !important; }
 
-        /* Coastline white borders */
-        .coast-top { border-top: 3px solid #ffffff !important; }
-        .coast-bottom { border-bottom: 3px solid #ffffff !important; }
-        .coast-left { border-left: 3px solid #ffffff !important; }
-        .coast-right { border-right: 3px solid #ffffff !important; }
-
-        /* Port Entrance indicators */
-        .port-entrance::after {
-            content: '';
-            position: absolute;
-            width: 35%;
-            height: 35%;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.35);
-            pointer-events: none;
-        }
-
-        /* Highlights */
+        /* Podświetlenia ruchów i ataków */
         .highlight-move {
-            box-shadow: inset 0 0 0 3px #4ade80;
-            background-color: rgba(74, 222, 128, 0.3) !important;
+            box-shadow: inset 0 0 0 2px #4ade80;
+            background-color: rgba(74, 222, 128, 0.35) !important;
         }
         .highlight-attack {
-            box-shadow: inset 0 0 0 3px #f87171;
-            background-color: rgba(248, 113, 113, 0.4) !important;
+            box-shadow: inset 0 0 0 2px #f87171;
+            background-color: rgba(248, 113, 113, 0.45) !important;
+        }
+        .highlight-mine {
+            box-shadow: inset 0 0 0 2px #fb923c;
+            background-color: rgba(251, 146, 60, 0.45) !important;
         }
         .highlight-selected {
-            box-shadow: inset 0 0 0 3px #ffffff;
-            background-color: rgba(255, 255, 255, 0.25) !important;
+            box-shadow: inset 0 0 0 3px #ffffff !important;
         }
-        .highlight-mine-place {
-            box-shadow: inset 0 0 0 3px #facc15;
-            background-color: rgba(250, 204, 21, 0.35) !important;
+        .highlight-pending {
+            box-shadow: inset 0 0 0 3px #38bdf8 !important;
         }
 
-        /* Unit Tokens */
+        /* Pionki */
         .unit-token {
-            width: 82%;
-            height: 82%;
-            border-radius: 4px;
+            width: 84%;
+            height: 84%;
+            border-radius: 6px;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             font-weight: 800;
-            font-size: clamp(7px, 1.3vw, 12px);
-            line-height: 1;
+            font-size: clamp(8px, 1.5vw, 13px);
             box-shadow: 0 2px 4px rgba(0,0,0,0.45);
-            border: 1.5px solid rgba(255,255,255,0.85);
+            border: 1.5px solid rgba(255,255,255,0.75);
             pointer-events: none;
-            z-index: 2;
         }
-        .unit-yellow {
+        .token-yellow {
             background: linear-gradient(135deg, #fef08a, #ca8a04);
             color: #422006;
         }
-        .unit-red {
-            background: linear-gradient(135deg, #fca5a5, #991b1b);
-            color: #fef2f2;
-        }
-        .unit-battery {
-            border-radius: 50%;
-            border: 2px solid #ffffff;
-        }
-        .unit-mine {
-            border-radius: 50%;
-            background: #1e293b;
-            color: #facc15;
-            border: 1.5px solid #facc15;
-        }
-
-        /* Island 4-tile special UI */
-        .island-tile-content {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-            font-size: clamp(8px, 1.4vw, 13px);
-            text-align: center;
+        .token-red {
+            background: linear-gradient(135deg, #fca5a5, #b91c1c);
             color: #ffffff;
-            font-weight: 700;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
-
-        /* Opponent Port Overlay during Setup */
-        #setup-overlay {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 22.222%; /* 4 columns out of 18 */
-            background: rgba(15, 23, 42, 0.94);
-            backdrop-filter: blur(6px);
-            z-index: 20;
-            display: flex;
-            flex-direction: column;
-            padding: 6px;
-            border: 1px solid #475569;
-            overflow-y: auto;
+        .token-battery {
+            border-radius: 50%;
+            border: 2px solid #1e293b;
         }
-        #setup-overlay.side-right { right: 0; }
-        #setup-overlay.side-left { left: 0; }
-
-        /* Action Bar floating at bottom center when needed */
-        #action-bar {
-            position: fixed;
-            bottom: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 30;
-            display: flex;
-            gap: 8px;
-            background: rgba(15, 23, 42, 0.9);
-            padding: 6px 12px;
-            border-radius: 9999px;
-            border: 1px solid #475569;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        .token-mine {
+            border-radius: 50%;
+            background: #1e293b !important;
+            color: #f8fafc !important;
+            border: 1.5px solid #94a3b8;
         }
     </style>
 </head>
-<body>
+<body class="flex flex-col h-screen w-screen overflow-hidden bg-slate-900">
 
-    <!-- LOBBY / CONNECTION MODAL -->
-    <div id="lobby-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 p-4">
-        <div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl">
-            <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-600/20 text-blue-400 mb-3">
-                    <i class="fa-solid fa-anchor text-2xl"></i>
-                </div>
-                <h1 class="text-2xl font-extrabold tracking-tight text-white">MANEWRY MORSKIE</h1>
-                <p class="text-xs text-slate-400 mt-1">Klasyczna gra taktyczna • Multiplayer P2P</p>
-            </div>
+    <!-- LOBBY POŁĄCZENIA P2P -->
+    <div id="lobby-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 p-4">
+        <div class="w-full max-w-md rounded-2xl bg-slate-800 p-6 shadow-2xl border border-slate-700 text-center">
+            <h1 class="text-2xl font-extrabold text-sky-400 mb-1">MANEWRY MORSKIE</h1>
+            <p class="text-xs text-slate-400 mb-6">Gra taktyczna online (PeerJS P2P)</p>
 
-            <!-- Host Section -->
-            <div class="bg-slate-800/70 rounded-xl p-4 mb-4 border border-slate-700">
-                <h2 class="text-sm font-bold text-yellow-400 mb-2 flex items-center gap-2">
-                    <i class="fa-solid fa-tower-broadcast"></i> Telefon 1 (Gracz Żółty)
-                </h2>
-                <button id="btn-create-room" class="w-full py-2.5 px-4 rounded-lg bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold text-sm transition cursor-pointer">
-                    Utwórz pokój
+            <div id="lobby-actions" class="space-y-4">
+                <button id="btn-create-room" class="w-full py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-95 font-bold text-white shadow-lg transition">
+                    Stwórz pokój (Gracz Żółty)
                 </button>
-                <div id="room-code-display" class="hidden mt-3 text-center">
-                    <p class="text-xs text-slate-400">Podaj ten 4-cyfrowy kod drugiemu graczowi:</p>
-                    <div id="generated-code" class="text-3xl font-black tracking-widest text-white my-1">----</div>
-                    <p id="host-status" class="text-xs text-blue-400 animate-pulse">Oczekiwanie na połączenie...</p>
-                </div>
-            </div>
 
-            <!-- Join Section -->
-            <div class="bg-slate-800/70 rounded-xl p-4 border border-slate-700">
-                <h2 class="text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
-                    <i class="fa-solid fa-right-to-bracket"></i> Telefon 2 (Gracz Czerwony)
-                </h2>
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-slate-700"></div>
+                    <span class="flex-shrink mx-3 text-slate-500 text-xs uppercase">lub dołącz</span>
+                    <div class="flex-grow border-t border-slate-700"></div>
+                </div>
+
                 <div class="flex gap-2">
-                    <input id="input-room-code" type="number" maxlength="4" placeholder="Kod (np. 4821)"
-                        class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-600 text-white text-center font-bold tracking-widest focus:outline-none focus:border-blue-500">
-                    <button id="btn-join-room" class="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition whitespace-nowrap cursor-pointer">
-                        Dołącz
+                    <input id="input-room-code" type="tel" maxlength="4" placeholder="Kod (4 cyfry)"
+                        class="w-1/2 rounded-xl bg-slate-900 border border-slate-600 px-3 py-3 text-center text-lg font-bold tracking-widest text-white focus:outline-none focus:border-sky-500">
+                    <button id="btn-join-room" class="w-1/2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 font-bold text-white shadow-lg transition">
+                        Dołącz (Czerwony)
                     </button>
                 </div>
-                <p id="join-status" class="text-xs text-slate-400 mt-2 hidden"></p>
+            </div>
+
+            <div id="lobby-waiting" class="hidden space-y-4 mt-4">
+                <p class="text-sm text-slate-300">Podaj ten kod drugiemu graczowi:</p>
+                <div id="display-room-code" class="text-4xl font-black tracking-widest text-yellow-400 bg-slate-900 py-3 rounded-xl border border-slate-700">----</div>
+                <p class="text-xs text-slate-400 animate-pulse">Oczekiwanie na połączenie przeciwnika...</p>
             </div>
         </div>
     </div>
 
-    <!-- MAIN GAME BOARD -->
-    <div id="game-wrapper">
-        <div id="board-container">
-            <!-- Cells generated by JS -->
+    <!-- GŁÓWNY EKRAN GRY -->
+    <div id="game-screen" class="hidden flex-1 flex flex-row w-full h-full p-1 sm:p-2 gap-1 sm:gap-2 overflow-hidden">
+        
+        <!-- LEWA STRONA: PLANSZA 18x12 -->
+        <div class="relative flex-1 h-full flex items-center justify-center overflow-hidden rounded-xl shadow-2xl bg-slate-950">
+            <div id="board-grid"></div>
 
-            <!-- Setup Overlay (placed over opponent's port) -->
-            <div id="setup-overlay" class="hidden">
-                <div class="flex flex-col gap-1.5 mb-2">
-                    <button id="btn-random-setup" class="w-full py-1.5 px-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] sm:text-xs shadow transition cursor-pointer">
-                        <i class="fa-solid fa-shuffle mr-1"></i>Losowo
+            <!-- NAKŁADKA DOK (tylko w fazie ustawiania, nad portem przeciwnika) -->
+            <div id="dock-overlay" class="hidden absolute top-1 bottom-1 w-[34%] bg-slate-900/95 border border-slate-600 rounded-xl p-2 flex flex-col justify-between z-20 shadow-2xl">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-extrabold text-sky-400 uppercase">DOK FLOTY</span>
+                        <span id="dock-remaining" class="text-[11px] font-bold text-slate-300">Pozostało: 26</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mb-1.5 leading-tight">Wybierz statek i kliknij w swój port. Kliknięcie statku w porcie zwraca go do doku.</p>
+                </div>
+
+                <div id="dock-list" class="flex-1 overflow-y-auto space-y-1 pr-1"></div>
+
+                <div class="pt-2 flex gap-1.5">
+                    <button id="btn-random-setup" class="flex-1 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow transition">
+                        Losowo
                     </button>
-                    <button id="btn-ready-battle" disabled class="w-full py-1.5 px-2 rounded bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500 hover:bg-emerald-500 text-white font-bold text-[10px] sm:text-xs shadow transition cursor-pointer">
-                        <i class="fa-solid fa-crosshairs mr-1"></i>Bitwa
+                    <button id="btn-confirm-setup" disabled class="flex-1 py-2 rounded-lg bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500 hover:bg-emerald-500 text-white font-bold text-xs shadow transition">
+                        Bitwa
                     </button>
                 </div>
-                <div class="text-[9px] sm:text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1 border-b border-slate-700 pb-0.5">
-                    Dok (<span id="dock-remaining">26</span>)
+            </div>
+        </div>
+
+        <!-- PRAWA STRONA: PANEL INFORMACYJNY -->
+        <div id="info-panel" class="w-36 sm:w-48 md:w-56 h-full bg-slate-800 border border-slate-700 rounded-xl p-2 flex flex-col justify-between shrink-0 shadow-xl">
+            
+            <!-- Góra: Status połączenia i tury -->
+            <div class="space-y-1.5">
+                <div class="flex items-center justify-between bg-slate-900/80 px-2 py-1 rounded-lg border border-slate-700">
+                    <span class="text-[10px] text-slate-400 font-semibold">Status:</span>
+                    <span id="conn-status" class="text-[10px] font-bold text-emerald-400">Połączono</span>
                 </div>
-                <div id="dock-list" class="flex flex-col gap-1 overflow-y-auto pr-0.5">
-                    <!-- Dock items generated by JS -->
+
+                <div id="turn-indicator" class="w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs bg-slate-700 text-white border border-slate-600">
+                    Faza ustawiania
                 </div>
+
+                <div class="grid grid-cols-2 gap-1">
+                    <button onclick="openModal('modal-rules')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[11px] font-bold text-sky-300 transition">
+                        📖 Zasady
+                    </button>
+                    <button onclick="openModal('modal-table')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[11px] font-bold text-amber-300 transition">
+                        📊 Tabela
+                    </button>
+                </div>
+            </div>
+
+            <!-- Środek: Informacje o zaznaczonym statku -->
+            <div class="flex-1 my-2 bg-slate-900/70 border border-slate-700 rounded-lg p-2 flex flex-col justify-center items-center text-center">
+                <div id="selected-unit-badge" class="hidden mb-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase"></div>
+                <div id="selected-unit-name" class="text-sm sm:text-base font-extrabold text-white leading-tight">
+                    Wybierz jednostkę
+                </div>
+                <div id="selected-unit-desc" class="text-[10px] sm:text-xs text-slate-400 mt-1 leading-snug">
+                    Kliknij swój statek na planszy, aby zobaczyć jego ruch i siłę.
+                </div>
+                <button id="btn-place-mine" class="hidden mt-2 w-full py-1.5 px-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shadow transition">
+                    💣 Stawiam minę
+                </button>
+            </div>
+
+            <!-- Dół: Przyciski Potwierdź i Anuluj -->
+            <div class="space-y-1.5">
+                <button id="btn-confirm-turn" disabled class="w-full py-2.5 rounded-lg bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500 hover:bg-emerald-500 text-white font-extrabold text-xs shadow transition">
+                    Potwierdź
+                </button>
+                <button id="btn-cancel-turn" disabled class="w-full py-2 rounded-lg bg-rose-600 disabled:bg-slate-700 disabled:text-slate-500 hover:bg-rose-500 text-white font-bold text-xs shadow transition">
+                    Anuluj
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- FLOATING ACTION BAR (for Trałowiec mine placement / disarming) -->
-    <div id="action-bar" class="hidden">
-        <button id="btn-place-mine" class="hidden px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer">
-            <i class="fa-solid fa-bomb mr-1"></i>Stawiam minę
-        </button>
-        <button id="btn-cancel-action" class="px-3 py-1.5 rounded-full bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs cursor-pointer">
-            Anuluj
-        </button>
-    </div>
-
-    <!-- TOAST MESSAGE -->
-    <div id="toast" class="fixed top-3 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2 rounded-full bg-slate-900/95 border border-slate-600 text-white text-xs font-semibold shadow-xl pointer-events-none">
-    </div>
-
-    <!-- INSTRUCTIONS MODAL (Island Tile 1) -->
-    <div id="modal-instructions" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/85 p-4">
-        <div class="w-full max-w-lg max-h-[85dvh] flex flex-col rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl">
-            <div class="flex items-center justify-between p-4 border-b border-slate-700">
-                <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-book mr-2 text-blue-400"></i>Zasady Gry</h3>
-                <button onclick="closeModal('modal-instructions')" class="text-slate-400 hover:text-white text-xl cursor-pointer">&times;</button>
+    <!-- MODAL: ZASADY GRY -->
+    <div id="modal-rules" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div class="bg-slate-800 border border-slate-600 rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl">
+            <div class="flex justify-between items-center p-4 border-b border-slate-700">
+                <h2 class="text-lg font-extrabold text-sky-400">Zasady Gry „Manewry Morskie”</h2>
+                <button onclick="closeModal('modal-rules')" class="text-slate-400 hover:text-white text-xl font-bold px-2">&times;</button>
             </div>
-            <div class="p-4 overflow-y-auto text-xs sm:text-sm text-slate-300 space-y-2.5 leading-relaxed">
-                <p><strong class="text-white">Cel gry:</strong> Przeprowadzenie własnego <em>Okrętu desantowego</em> do wejścia portu przeciwnika (Żółty do Q3/O10, Czerwony do D3/B10). Utrata okrętu desantowego lub wszystkich 3 okrętów rakietowych oznacza przegraną.</p>
-                <p><strong class="text-white">Poruszanie się:</strong> Okręty poruszają się we wszystkich 8 kierunkach (w tym po skosie) o liczbę pól równą ich szybkości (lub mniej dla zmylenia przeciwnika). Nie wolno przeskakiwać innych jednostek ani przekraczać białej linii brzegowej.</p>
-                <p><strong class="text-white">Bicie:</strong> Atak następuje przez wejście w zasięg bicia lub kliknięcie wrogiego okrętu w zasięgu. Jednostki ujawniają się, silniejsza zostaje, słabsza ginie. Takie same jednostki giną obie.</p>
-                <p><strong class="text-white">Baterie nabrzeżne:</strong> Stoją na stałe przy wejściach do portu. Blokują wejście w zasięgu 1 pola i niszczą każdy okręt oprócz <em>Okrętu rakietowego</em>, który jako jedyny może je zniszczyć.</p>
-                <p><strong class="text-white">Miny i Trałowiec:</strong> Tylko <em>Trałowiec</em> może stawiać miny (max 6) na sąsiednim polu morskim przed lub po ruchu. Tylko <em>Trałowiec</em> może bezpiecznie zdjąć minę przeciwnika.</p>
-                <p><strong class="text-white">Wody neutralne:</strong> Zakropkowane pola wokół wyspy. Okręt może tam przebywać max 3 własne tury; w 4. turze musi wypłynąć, inaczej ulega internowaniu (zniszczeniu). Na wodach neutralnych nie ma walki ani min.</p>
+            <div class="p-4 overflow-y-auto text-xs sm:text-sm text-slate-300 space-y-2 leading-relaxed">
+                <p><strong>1. Cel gry:</strong> Wprowadzić swój <em>Okręt desantowy</em> do portu przeciwnika (przez wejścia: <strong>Q3/O10</strong> dla Żółtych lub <strong>D3/B10</strong> dla Czerwonych). Utrata Okrętu desantowego lub wszystkich 3 Okrętów rakietowych oznacza przegraną.</p>
+                <p><strong>2. Ruch:</strong> Okręty poruszają się we wszystkich 8 kierunkach (również po skosie) o maksymalnie tyle pól, ile wynosi ich zasięg. Nie można przeskakiwać innych jednostek ani przekraczać białej linii brzegowej.</p>
+                <p><strong>3. Bicie:</strong> Atak następuje przez wejście na pole zajęte przez wroga. Jednostka silniejsza zostaje, słabsza ginie. Remis = obie giną.</p>
+                <p><strong>4. Baterie nabrzeżne:</strong> Blokują przejście wrogim okrętom w zasięgu 1 pola. Może je zniszczyć wyłącznie <em>Okręt rakietowy</em>.</p>
+                <p><strong>5. Miny:</strong> Stawia je tylko <em>Trałowiec</em> na sąsiednim polu (przycisk „Stawiam minę”). Minę może bezpiecznie zdjąć tylko wrogi Trałowiec; każdy inny okręt tonie razem z miną.</p>
+                <p><strong>6. Wody neutralne:</strong> Kropkowane pola wokół wyspy. Okręt może tam przebywać maks. 3 swoje tury (w 4. turze ulega internowaniu). Na wodach neutralnych nie można atakować ani stawiać min.</p>
             </div>
         </div>
     </div>
 
-    <!-- UNIT TABLE MODAL (Island Tile 2) -->
-    <div id="modal-units" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/85 p-4">
-        <div class="w-full max-w-2xl max-h-[85dvh] flex flex-col rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl">
-            <div class="flex items-center justify-between p-4 border-b border-slate-700">
-                <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-table mr-2 text-emerald-400"></i>Tabela Jednostek</h3>
-                <button onclick="closeModal('modal-units')" class="text-slate-400 hover:text-white text-xl cursor-pointer">&times;</button>
+    <!-- MODAL: TABELA JEDNOSTEK -->
+    <div id="modal-table" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div class="bg-slate-800 border border-slate-600 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+            <div class="flex justify-between items-center p-4 border-b border-slate-700">
+                <h2 class="text-lg font-extrabold text-amber-400">Tabela Jednostek</h2>
+                <button onclick="closeModal('modal-table')" class="text-slate-400 hover:text-white text-xl font-bold px-2">&times;</button>
             </div>
             <div class="p-3 overflow-y-auto">
-                <table class="w-full text-left text-[11px] sm:text-xs border-collapse">
+                <table class="w-full text-left border-collapse text-xs">
                     <thead>
-                        <tr class="bg-slate-800 text-slate-200 border-b border-slate-600">
-                            <th class="p-2">Jednostka</th>
-                            <th class="p-2 text-center">Ruch</th>
-                            <th class="p-2">Siła jednostki</th>
-                            <th class="p-2 text-center">Szt.</th>
+                        <tr class="border-b border-slate-600 text-slate-400">
+                            <th class="py-2 px-1">Jednostka (Inicjał)</th>
+                            <th class="py-2 px-1 text-center">Ruch</th>
+                            <th class="py-2 px-1">Siła / Zasady</th>
+                            <th class="py-2 px-1 text-center">Szt.</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-800 text-slate-300">
-                        <tr><td class="p-2 font-bold text-white">Pancernik (PA)</td><td class="p-2 text-center">2</td><td class="p-2">Ulega atakowi okrętu podwodnego</td><td class="p-2 text-center">3</td></tr>
-                        <tr><td class="p-2 font-bold text-white">Okręt rakietowy (OR)</td><td class="p-2 text-center">1</td><td class="p-2">Ulega pancernikowi i okr. podwodnemu. Niszczy baterie!</td><td class="p-2 text-center">3</td></tr>
-                        <tr><td class="p-2 font-bold text-white">Krążownik (KR)</td><td class="p-2 text-center">2</td><td class="p-2">Ulega pancernikowi, okr. rakietowemu i podwodnemu</td><td class="p-2 text-center">3</td></tr>
-                        <tr><td class="p-2 font-bold text-white">Niszczyciel (NI)</td><td class="p-2 text-center">4</td><td class="p-2">Ulega PA, OR, KR oraz OP (jeśli OP zaatakuje pierwszy)</td><td class="p-2 text-center">4</td></tr>
-                        <tr><td class="p-2 font-bold text-white">Okręt podwodny (OP)</td><td class="p-2 text-center">2</td><td class="p-2">Ulega eskortowcowi oraz niszczycielowi (jeśli NI zaatakuje pierwszy)</td><td class="p-2 text-center">4</td></tr>
-                        <tr><td class="p-2 font-bold text-white">Eskortowiec (ES)</td><td class="p-2 text-center">3</td><td class="p-2">Ulega wszystkim oprócz okr. podwodnego i trałowca</td><td class="p-2 text-center">4</td></tr>
-                        <tr><td class="p-2 font-bold text-white">Trałowiec (TR)</td><td class="p-2 text-center">2</td><td class="p-2">Ulega wszystkim. Stawia i rozbraja miny</td><td class="p-2 text-center">4</td></tr>
-                        <tr><td class="p-2 font-bold text-amber-400">Okręt desantowy (OD)</td><td class="p-2 text-center">1</td><td class="p-2">Ulega wszystkim. Nie atakuje nikogo. Cel gry!</td><td class="p-2 text-center">1</td></tr>
-                        <tr><td class="p-2 font-bold text-slate-200">Bateria nabrzeżna (BA)</td><td class="p-2 text-center">—</td><td class="p-2">Bije wszystko w zasięgu 1 pola oprócz okr. rakietowego</td><td class="p-2 text-center">4</td></tr>
-                        <tr><td class="p-2 font-bold text-yellow-400">Mina (MI)</td><td class="p-2 text-center">—</td><td class="p-2">Zaatakowana bije wszystko oprócz trałowca</td><td class="p-2 text-center">6</td></tr>
+                    <tbody class="divide-y divide-slate-700 text-slate-200">
+                        <tr><td class="py-1.5 px-1 font-bold">Pancernik (PN)</td><td class="text-center">2</td><td>Ulega tylko Okrętowi podwodnemu</td><td class="text-center">3</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Okręt rakietowy (OR)</td><td class="text-center">1</td><td>Ulega Pancernikowi i Podwodnemu. Niszczy Baterie</td><td class="text-center">3</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Krążownik (KR)</td><td class="text-center">2</td><td>Ulega Pancernikowi, Rakietowemu i Podwodnemu</td><td class="text-center">3</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Niszczyciel (NI)</td><td class="text-center">4</td><td>Ulega PN, OR, KR oraz Podwodnemu (gdy ten atakuje)</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Okręt podwodny (OP)</td><td class="text-center">2</td><td>Ulega Eskortowcowi oraz Niszczycielowi (gdy ten atakuje)</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Eskortowiec (ES)</td><td class="text-center">3</td><td>Ulega wszystkim oprócz Podwodnego i Trałowca</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Trałowiec (TR)</td><td class="text-center">2</td><td>Ulega wszystkim. Stawia i zdejmuje Miny</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Okręt desantowy (OD)</td><td class="text-center">1</td><td>Ulega wszystkim. Nie atakuje. Cel gry</td><td class="text-center">1</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Bateria nabrzeżna (BN)</td><td class="text-center">-</td><td>Bije w zasięgu 1 pola wszystko oprócz Rakietowego</td><td class="text-center">4</td></tr>
+                        <tr><td class="py-1.5 px-1 font-bold">Mina (MN)</td><td class="text-center">-</td><td>Niszczy każdy okręt oprócz Trałowca</td><td class="text-center">6</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- GAME OVER MODAL -->
-    <div id="modal-gameover" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/90 p-4">
-        <div class="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-700 p-6 text-center shadow-2xl">
-            <div id="gameover-icon" class="text-5xl mb-3">🏆</div>
-            <h2 id="gameover-title" class="text-2xl font-black text-white mb-2">Koniec Gry!</h2>
-            <p id="gameover-reason" class="text-sm text-slate-300 mb-5"></p>
-            <button onclick="location.reload()" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm cursor-pointer">
+    <!-- MODAL: KONIEC GRY -->
+    <div id="modal-gameover" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+        <div class="bg-slate-800 border-2 border-amber-400 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
+            <h2 id="gameover-title" class="text-2xl font-black text-amber-400 mb-2">KONIEC GRY</h2>
+            <p id="gameover-reason" class="text-sm text-slate-200 mb-6"></p>
+            <button onclick="location.reload()" class="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold shadow-lg transition">
                 Zagraj ponownie
             </button>
         </div>
     </div>
 
+    <!-- TOAST POWIADOMIEŃ -->
+    <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-slate-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-2xl text-center max-w-[90vw]"></div>
+
     <script>
         // ==========================================
-        // 1. CONSTANTS & UNIT DEFINITIONS
+        // 1. STAŁE I DEFINICJE JEDNOSTEK
         // ==========================================
         const COLS = 18; // A-R (0-17)
         const ROWS = 12; // 1-12 (0-11)
 
         const UNIT_TYPES = {
-            PA: { name: 'Pancernik', speed: 2, count: 3, short: 'PA' },
-            OR: { name: 'Okręt rakietowy', speed: 1, count: 3, short: 'OR' },
-            KR: { name: 'Krążownik', speed: 2, count: 3, short: 'KR' },
-            NI: { name: 'Niszczyciel', speed: 4, count: 4, short: 'NI' },
-            OP: { name: 'Okręt podwodny', speed: 2, count: 4, short: 'OP' },
-            ES: { name: 'Eskortowiec', speed: 3, count: 4, short: 'ES' },
-            TR: { name: 'Trałowiec', speed: 2, count: 4, short: 'TR' },
-            OD: { name: 'Okręt desantowy', speed: 1, count: 1, short: 'OD' }
+            PN: { code: 'PN', name: 'Pancernik', move: 2, count: 3, desc: 'Ruch: 2 pola. Ulega tylko Okrętowi podwodnemu.' },
+            OR: { code: 'OR', name: 'Okręt rakietowy', move: 1, count: 3, desc: 'Ruch: 1 pole. Niszczy Baterie nabrzeżne.' },
+            KR: { code: 'KR', name: 'Krążownik', move: 2, count: 3, desc: 'Ruch: 2 pola. Ulega PN, OR i OP.' },
+            NI: { code: 'NI', name: 'Niszczyciel', move: 4, count: 4, desc: 'Ruch: 4 pola. Szybki okręt zwiadowczy.' },
+            OP: { code: 'OP', name: 'Okręt podwodny', move: 2, count: 4, desc: 'Ruch: 2 pola. Niszczy Pancerniki i Rakietowe.' },
+            ES: { code: 'ES', name: 'Eskortowiec', move: 3, count: 4, desc: 'Ruch: 3 pola. Zwalcza Okręty podwodne.' },
+            TR: { code: 'TR', name: 'Trałowiec', move: 2, count: 4, desc: 'Ruch: 2 pola. Stawia i usuwa Miny.' },
+            OD: { code: 'OD', name: 'Okręt desantowy', move: 1, count: 1, desc: 'Ruch: 1 pole. Musi dotrzeć do portu wroga.' },
+            BN: { code: 'BN', name: 'Bateria nabrzeżna', move: 0, count: 4, desc: 'Stała obrona portu. Blokuje przejście w zasięgu 1 pola.' },
+            MN: { code: 'MN', name: 'Mina', move: 0, count: 6, desc: 'Pułapka. Niszczy każdy okręt oprócz Trałowca.' }
         };
 
-        // Helper to convert "D2" -> {c: 3, r: 1}
-        function coord(str) {
-            const col = str.charCodeAt(0) - 65;
-            const row = parseInt(str.slice(1), 10) - 1;
-            return { c: col, r: row };
+        // Współrzędne pomocnicze (np. "D2" -> {c: 3, r: 1})
+        function parseCoord(str) {
+            const c = str.charCodeAt(0) - 65;
+            const r = parseInt(str.slice(1), 10) - 1;
+            return { c, r };
         }
-        function key(c, r) { return `${c},${r}`; }
-
-        // Fixed Batteries
-        const YELLOW_BATTERIES = ['D2', 'D4', 'B9', 'C11'].map(coord);
-        const RED_BATTERIES = ['P2', 'Q4', 'O9', 'O11'].map(coord);
-
-        // Port Entrances
-        const YELLOW_ENTRANCES = ['D3', 'B10'].map(coord);
-        const RED_ENTRANCES = ['Q3', 'O10'].map(coord);
-
-        // Coastline edges (walls that cannot be crossed)
-        const COAST_WALLS = new Set();
-        function addWall(c1, r1, c2, r2) {
-            COAST_WALLS.add(`${c1},${r1}-${c2},${r2}`);
-            COAST_WALLS.add(`${c2},${r2}-${c1},${r1}`);
+        function toCoord(c, r) {
+            return String.fromCharCode(65 + c) + (r + 1);
         }
 
-        // Yellow Coastlines
-        ['D1','D2','D4','D5','B6','B7','B8','B9','C11','C12'].forEach(s => { const {c,r} = coord(s); addWall(c,r,c+1,r); }); // right
-        ['D2','D5','C5','B9'].forEach(s => { const {c,r} = coord(s); addWall(c,r,c,r+1); }); // bottom
-        ['D4','B11','C11'].forEach(s => { const {c,r} = coord(s); addWall(c,r,c,r-1); }); // top
+        // Stałe pozycje baterii
+        const YELLOW_BATTERIES = ['D2', 'D4', 'B9', 'C11'];
+        const RED_BATTERIES = ['P2', 'Q4', 'O9', 'O11'];
 
-        // Red Coastlines
-        ['P1','P2','Q4','Q5','Q6','Q7','O8','O9','O11','O12'].forEach(s => { const {c,r} = coord(s); addWall(c,r,c-1,r); }); // left
-        ['P2','Q2','O9'].forEach(s => { const {c,r} = coord(s); addWall(c,r,c,r+1); }); // bottom
-        ['Q4','O8','P8','O11'].forEach(s => { const {c,r} = coord(s); addWall(c,r,c,r-1); }); // top
+        // Wejścia do portów (jedyne miejsca wyjścia i desantu)
+        const YELLOW_ENTRANCES = ['D3', 'B10'];
+        const RED_ENTRANCES = ['Q3', 'O10'];
 
-        // Island & Neutral Waters
-        const ISLAND_TILES = ['I6', 'J6', 'I7', 'J7'].map(coord);
-        const NEUTRAL_TILES = ['H5','I5','J5','H6','K6','L6','G7','H7','K7','I8','J8','K8'].map(coord);
+        // Wyspa (4 pola na środku: I6, J6, I7, J7)
+        const ISLAND_CELLS = new Set(['I6', 'J6', 'I7', 'J7']);
+
+        // Wody neutralne wokół wyspy
+        const NEUTRAL_CELLS = new Set([
+            'H5', 'I5', 'J5',
+            'H6', 'K6', 'L6',
+            'G7', 'H7', 'K7',
+            'I8', 'J8', 'K8'
+        ]);
+
+        // Linie brzegowe (ściany)
+        const WALLS = {};
+        function addWall(coord, side) {
+            if (!WALLS[coord]) WALLS[coord] = new Set();
+            WALLS[coord].add(side);
+        }
+        // Żółty brzeg
+        ['D1', 'D2', 'D4', 'D5', 'B6', 'B7', 'B8', 'B9', 'C11', 'C12'].forEach(c => addWall(c, 'right'));
+        ['D2', 'D5', 'C5', 'B9'].forEach(c => addWall(c, 'bottom'));
+        ['D4', 'B11', 'C11'].forEach(c => addWall(c, 'top'));
+        // Czerwony brzeg
+        ['P1', 'P2', 'Q4', 'Q5', 'Q6', 'Q7', 'O8', 'O9', 'O11', 'O12'].forEach(c => addWall(c, 'left'));
+        ['P2', 'Q2', 'O9'].forEach(c => addWall(c, 'bottom'));
+        ['Q4', 'O8', 'P8', 'O11'].forEach(c => addWall(c, 'top'));
 
         // ==========================================
-        // 2. GAME STATE
+        // 2. STAN GRY I POŁĄCZENIE P2P
         // ==========================================
         let peer = null;
         let conn = null;
-        let myColor = null; // 'yellow' or 'red'
-        let phase = 'LOBBY'; // 'LOBBY', 'SETUP', 'BATTLE', 'GAMEOVER'
-        let turn = 'yellow';
+        let myColor = null; // 'yellow' | 'red'
+        let phase = 'lobby'; // 'lobby' | 'setup' | 'battle' | 'gameover'
+        let currentTurn = 'yellow';
         let myReady = false;
         let enemyReady = false;
 
-        // Board units: map of "c,r" -> { id, owner, type, revealed, neutralTurns }
-        // type can be 'PA','OR','KR','NI','OP','ES','TR','OD','BA','MI'
-        let units = {};
+        // Plansza: mapa coord -> obiekt jednostki { id, type, owner, revealed, neutralTurns }
+        let board = {};
         let dockCounts = {};
         let selectedDockType = null;
-        let selectedCell = null; // {c, r}
-        let validMoves = [];
-        let validAttacks = [];
-        let minePlacementMode = false;
-        let myMinesRemaining = 6;
+        let selectedCell = null; // coord wybranego statku na planszy
+        let placingMineMode = false;
+
+        // Buforowany ruch przed kliknięciem [Potwierdź]
+        let pendingAction = null; // { type: 'move'|'attack'|'mine', from, to, snapshotBoard }
 
         // ==========================================
-        // 3. PEERJS NETWORKING
+        // 3. INICJALIZACJA P2P (PEERJS)
         // ==========================================
-        const lobbyModal = document.getElementById('lobby-modal');
         const btnCreateRoom = document.getElementById('btn-create-room');
         const btnJoinRoom = document.getElementById('btn-join-room');
         const inputRoomCode = document.getElementById('input-room-code');
 
         btnCreateRoom.addEventListener('click', () => {
+            if (typeof Peer === 'undefined') {
+                showToast('Błąd: Biblioteka PeerJS nie została załadowana. Odśwież stronę.');
+                return;
+            }
             const code = Math.floor(1000 + Math.random() * 9000).toString();
             const peerId = `manewry-morskie-${code}`;
-            btnCreateRoom.disabled = true;
-            document.getElementById('room-code-display').classList.remove('hidden');
-            document.getElementById('generated-code').textContent = code;
+            myColor = 'yellow';
+
+            document.getElementById('lobby-actions').classList.add('hidden');
+            document.getElementById('lobby-waiting').classList.remove('hidden');
+            document.getElementById('display-room-code').textContent = code;
 
             peer = new Peer(peerId);
-            peer.on('open', () => {
-                myColor = 'yellow';
-            });
-            peer.on('connection', (connection) => {
-                conn = connection;
-                setupConnectionHandlers();
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConnection();
             });
             peer.on('error', (err) => {
                 showToast('Błąd połączenia: ' + err.type);
-                btnCreateRoom.disabled = false;
             });
         });
 
         btnJoinRoom.addEventListener('click', () => {
+            if (typeof Peer === 'undefined') {
+                showToast('Błąd: Biblioteka PeerJS nie została załadowana. Odśwież stronę.');
+                return;
+            }
             const code = inputRoomCode.value.trim();
             if (code.length !== 4) {
                 showToast('Wpisz 4-cyfrowy kod pokoju!');
                 return;
             }
-            const statusEl = document.getElementById('join-status');
-            statusEl.textContent = 'Łączenie...';
-            statusEl.classList.remove('hidden');
-            btnJoinRoom.disabled = true;
-
+            myColor = 'red';
             peer = new Peer();
             peer.on('open', () => {
-                myColor = 'red';
                 conn = peer.connect(`manewry-morskie-${code}`);
-                setupConnectionHandlers();
+                setupConnection();
             });
             peer.on('error', (err) => {
-                statusEl.textContent = 'Nie znaleziono pokoju lub błąd sieci.';
-                btnJoinRoom.disabled = false;
+                showToast('Nie można dołączyć: ' + err.type);
             });
         });
 
-        function setupConnectionHandlers() {
+        function setupConnection() {
             conn.on('open', () => {
-                lobbyModal.classList.add('hidden');
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('game-screen').classList.remove('hidden');
                 initGame();
-                updateConnectionStatus(true);
-                showToast(`Połączono! Grasz jako ${myColor === 'yellow' ? 'ŻÓŁTY' : 'CZERWONY'}`);
             });
-
-            conn.on('data', (data) => {
-                handleNetworkMessage(data);
-            });
-
+            conn.on('data', (data) => handleNetworkData(data));
             conn.on('close', () => {
-                updateConnectionStatus(false);
+                document.getElementById('conn-status').textContent = 'Rozłączono';
+                document.getElementById('conn-status').classList.replace('text-emerald-400', 'text-rose-500');
                 showToast('Przeciwnik rozłączył się!');
             });
         }
 
-        function sendMsg(msg) {
-            if (conn && conn.open) {
-                conn.send(msg);
-            }
+        function sendData(payload) {
+            if (conn && conn.open) conn.send(payload);
         }
 
         // ==========================================
-        // 4. BOARD & TERRAIN INITIALIZATION
+        // 4. INICJALIZACJA PLANSZY I DOKU
         // ==========================================
-        function getTerrain(c, r) {
-            if (ISLAND_TILES.some(t => t.c === c && t.r === r)) return 'island';
-            if (NEUTRAL_TILES.some(t => t.c === c && t.r === r)) return 'neutral';
-
-            // Yellow Port
-            if (r <= 4 && c <= 3) return 'yellow-port';
-            if (r >= 5 && r <= 9 && c <= 1) return 'yellow-port';
-            if (r >= 10 && c <= 2) return 'yellow-port';
-
-            // Red Port
-            if (r <= 1 && c >= 15) return 'red-port';
-            if (r >= 2 && r <= 6 && c >= 16) return 'red-port';
-            if (r >= 7 && c >= 14) return 'red-port';
-
-            return 'sea';
+        function isYellowPort(c, r) {
+            if (c <= 1) return true;
+            if (c === 2 && (r <= 4 || r >= 9)) return true;
+            if (c === 3 && r <= 4) return true;
+            return false;
+        }
+        function isRedPort(c, r) {
+            if (c >= 16) return true;
+            if (c === 15 && (r <= 2 || r >= 7)) return true;
+            if (c === 14 && r >= 7) return true;
+            return false;
         }
 
         function initGame() {
-            phase = 'SETUP';
-            // Reset Dock
-            for (const [type, info] of Object.entries(UNIT_TYPES)) {
-                dockCounts[type] = info.count;
-            }
+            phase = 'setup';
+            board = {};
 
-            // Place fixed batteries
-            YELLOW_BATTERIES.forEach((pos, idx) => {
-                units[key(pos.c, pos.r)] = { id: `y-ba-${idx}`, owner: 'yellow', type: 'BA', revealed: true };
+            // Ustawienie stałych baterii
+            YELLOW_BATTERIES.forEach((coord, i) => {
+                board[coord] = { id: `y-bn-${i}`, type: 'BN', owner: 'yellow', revealed: true, neutralTurns: 0 };
             });
-            RED_BATTERIES.forEach((pos, idx) => {
-                units[key(pos.c, pos.r)] = { id: `r-ba-${idx}`, owner: 'red', type: 'BA', revealed: true };
+            RED_BATTERIES.forEach((coord, i) => {
+                board[coord] = { id: `r-bn-${i}`, type: 'BN', owner: 'red', revealed: true, neutralTurns: 0 };
             });
 
-            // Position setup overlay over opponent's port
-            const overlay = document.getElementById('setup-overlay');
-            overlay.classList.remove('hidden');
+            // Inicjalizacja doku (26 okrętów)
+            dockCounts = { PN: 3, OR: 3, KR: 3, NI: 4, OP: 4, ES: 4, TR: 4, OD: 1 };
+
+            // Pozycjonowanie nakładki DOK nad portem przeciwnika
+            const dockOverlay = document.getElementById('dock-overlay');
+            dockOverlay.classList.remove('hidden');
             if (myColor === 'yellow') {
-                overlay.classList.add('side-right');
-                overlay.classList.remove('side-left');
+                dockOverlay.classList.add('right-1');
+                dockOverlay.classList.remove('left-1');
             } else {
-                overlay.classList.add('side-left');
-                overlay.classList.remove('side-right');
+                dockOverlay.classList.add('left-1');
+                dockOverlay.classList.remove('right-1');
             }
 
             renderBoard();
             renderDock();
+            updateUI();
         }
 
         function renderBoard() {
-            const container = document.getElementById('board-container');
-            // Keep setup-overlay if present
-            const overlay = document.getElementById('setup-overlay');
-            container.innerHTML = '';
-            container.appendChild(overlay);
+            const grid = document.getElementById('board-grid');
+            grid.innerHTML = '';
+
+            // Obliczanie podświetleń
+            let validMoves = new Set();
+            let validAttacks = new Set();
+            let validMines = new Set();
+
+            if (phase === 'battle' && currentTurn === myColor && selectedCell && !pendingAction) {
+                const unit = board[selectedCell];
+                if (unit && unit.owner === myColor) {
+                    if (placingMineMode && unit.type === 'TR') {
+                        validMines = getAdjacentMineCells(selectedCell);
+                    } else if (unit.type !== 'BN' && unit.type !== 'MN') {
+                        const res = getValidMovesAndAttacks(selectedCell, unit);
+                        validMoves = res.moves;
+                        validAttacks = res.attacks;
+                    }
+                }
+            }
 
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
+                    const coord = toCoord(c, r);
                     const cell = document.createElement('div');
-                    cell.className = `cell terrain-${getTerrain(c, r)}`;
-                    cell.dataset.c = c;
-                    cell.dataset.r = r;
+                    cell.className = 'cell';
+                    cell.dataset.coord = coord;
 
-                    // Coastline borders
-                    if (COAST_WALLS.has(`${c},${r}-${c},${r-1}`)) cell.classList.add('coast-top');
-                    if (COAST_WALLS.has(`${c},${r}-${c},${r+1}`)) cell.classList.add('coast-bottom');
-                    if (COAST_WALLS.has(`${c},${r}-${c-1},${r}`)) cell.classList.add('coast-left');
-                    if (COAST_WALLS.has(`${c},${r}-${c+1},${r}`)) cell.classList.add('coast-right');
-
-                    // Port entrances
-                    if (YELLOW_ENTRANCES.some(e => e.c === c && e.r === r) || RED_ENTRANCES.some(e => e.c === c && e.r === r)) {
-                        cell.classList.add('port-entrance');
-                    }
-
-                    // Island 4 tiles special content
-                    if (c === 8 && r === 5) { // I6: Book
-                        cell.innerHTML = `<div class="island-tile-content"><i class="fa-solid fa-book text-sm sm:text-base"></i></div>`;
-                        cell.onclick = () => openModal('modal-instructions');
-                    } else if (c === 9 && r === 5) { // J6: Table
-                        cell.innerHTML = `<div class="island-tile-content"><i class="fa-solid fa-table text-sm sm:text-base"></i></div>`;
-                        cell.onclick = () => openModal('modal-units');
-                    } else if (c === 8 && r === 6) { // I7: Turn
-                        cell.id = 'island-turn-tile';
-                        cell.innerHTML = `<div class="island-tile-content" id="turn-indicator">TURA</div>`;
-                    } else if (c === 9 && r === 6) { // J7: Status
-                        cell.id = 'island-status-tile';
-                        cell.innerHTML = `<div class="island-tile-content" id="conn-indicator"><i class="fa-solid fa-wifi text-emerald-300"></i></div>`;
+                    if (ISLAND_CELLS.has(coord)) {
+                        cell.classList.add('cell-island');
+                    } else if (NEUTRAL_CELLS.has(coord)) {
+                        cell.classList.add('cell-neutral');
+                    } else if (isYellowPort(c, r)) {
+                        cell.classList.add('cell-port-yellow');
+                    } else if (isRedPort(c, r)) {
+                        cell.classList.add('cell-port-red');
                     } else {
-                        cell.onclick = () => onCellClick(c, r);
+                        cell.classList.add('cell-sea');
                     }
 
-                    // Render Unit if present
-                    const u = units[key(c, r)];
-                    if (u) {
-                        const token = document.createElement('div');
-                        const isMine = u.owner === myColor;
-                        token.className = `unit-token ${u.owner === 'yellow' ? 'unit-yellow' : 'unit-red'}`;
-                        if (u.type === 'BA') token.classList.add('unit-battery');
-                        if (u.type === 'MI') token.classList.add('unit-mine');
+                    // Białe linie brzegowe
+                    if (WALLS[coord]) {
+                        WALLS[coord].forEach(side => cell.classList.add(`wall-${side}`));
+                    }
 
-                        if (isMine || u.revealed) {
-                            token.textContent = u.type;
+                    // Podświetlenia
+                    if (selectedCell === coord) cell.classList.add('highlight-selected');
+                    if (pendingAction && pendingAction.to === coord) cell.classList.add('highlight-pending');
+                    if (validMoves.has(coord)) cell.classList.add('highlight-move');
+                    if (validAttacks.has(coord)) cell.classList.add('highlight-attack');
+                    if (validMines.has(coord)) cell.classList.add('highlight-mine');
+
+                    // Pionek
+                    const unit = board[coord];
+                    if (unit) {
+                        const token = document.createElement('div');
+                        token.className = `unit-token ${unit.owner === 'yellow' ? 'token-yellow' : 'token-red'}`;
+                        if (unit.type === 'BN') token.classList.add('token-battery');
+                        if (unit.type === 'MN') token.classList.add('token-mine');
+
+                        if (unit.owner === myColor || unit.revealed) {
+                            token.textContent = unit.type;
                         } else {
-                            token.innerHTML = `<i class="fa-solid fa-ship text-[9px] sm:text-xs"></i>`;
+                            token.textContent = '?';
                         }
                         cell.appendChild(token);
                     }
 
-                    // Highlights
-                    if (selectedCell && selectedCell.c === c && selectedCell.r === r) {
-                        cell.classList.add('highlight-selected');
-                    }
-                    if (validMoves.some(m => m.c === c && m.r === r)) {
-                        cell.classList.add(minePlacementMode ? 'highlight-mine-place' : 'highlight-move');
-                    }
-                    if (validAttacks.some(a => a.c === c && a.r === r)) {
-                        cell.classList.add('highlight-attack');
-                    }
-
-                    container.appendChild(cell);
+                    cell.addEventListener('click', () => onCellClick(coord, c, r));
+                    grid.appendChild(cell);
                 }
             }
-            updateTurnIndicator();
         }
 
-        // ==========================================
-        // 5. SETUP PHASE LOGIC
-        // ==========================================
         function renderDock() {
             const list = document.getElementById('dock-list');
             list.innerHTML = '';
-            let totalRemaining = 0;
+            let total = 0;
 
-            for (const [type, info] of Object.entries(UNIT_TYPES)) {
+            Object.keys(dockCounts).forEach(type => {
                 const count = dockCounts[type];
-                totalRemaining += count;
-                if (count === 0) continue;
+                total += count;
+                const info = UNIT_TYPES[type];
 
                 const btn = document.createElement('button');
-                btn.className = `flex items-center justify-between px-2 py-1 rounded text-[10px] sm:text-xs font-semibold border transition cursor-pointer ${
+                btn.className = `w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-bold border transition ${
                     selectedDockType === type
-                        ? 'bg-blue-600 border-white text-white'
-                        : 'bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700'
+                        ? 'bg-sky-600 border-sky-400 text-white'
+                        : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
                 }`;
-                btn.innerHTML = `<span class="truncate">${info.name}</span><span class="ml-1 px-1.5 py-0.5 rounded bg-slate-950 text-amber-400 font-bold">${count}</span>`;
-                btn.onclick = () => {
-                    selectedDockType = (selectedDockType === type) ? null : type;
-                    renderDock();
-                };
-                list.appendChild(btn);
-            }
+                if (count === 0) btn.classList.add('opacity-40');
 
-            document.getElementById('dock-remaining').textContent = totalRemaining;
-            document.getElementById('btn-ready-battle').disabled = (totalRemaining > 0 || myReady);
-        }
-
-        document.getElementById('btn-random-setup').addEventListener('click', () => {
-            if (myReady) return;
-            const myPortTerrain = myColor === 'yellow' ? 'yellow-port' : 'red-port';
-            const emptyPortCells = [];
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = 0; c < COLS; c++) {
-                    if (getTerrain(c, r) === myPortTerrain && !units[key(c, r)]) {
-                        emptyPortCells.push({ c, r });
+                btn.innerHTML = `<span>${info.name} (${type})</span><span class="bg-slate-900 px-1.5 py-0.5 rounded text-[10px]">${count}</span>`;
+                btn.addEventListener('click', () => {
+                    if (count > 0) {
+                        selectedDockType = type;
+                        renderDock();
                     }
-                }
-            }
-            // Shuffle empty cells
-            emptyPortCells.sort(() => Math.random() - 0.5);
+                });
+                list.appendChild(btn);
+            });
 
-            for (const [type, count] of Object.entries(dockCounts)) {
-                while (dockCounts[type] > 0 && emptyPortCells.length > 0) {
-                    const pos = emptyPortCells.pop();
-                    units[key(pos.c, pos.r)] = {
-                        id: `${myColor}-${type}-${Math.random().toString(36).substr(2, 5)}`,
-                        owner: myColor,
-                        type: type,
-                        revealed: false,
-                        neutralTurns: 0
-                    };
-                    dockCounts[type]--;
-                }
-            }
-            selectedDockType = null;
-            renderBoard();
-            renderDock();
-        });
-
-        document.getElementById('btn-ready-battle').addEventListener('click', () => {
-            myReady = true;
-            document.getElementById('btn-ready-battle').disabled = true;
-            document.getElementById('btn-random-setup').disabled = true;
-
-            // Collect my placed ships to send to opponent (hidden types!)
-            const myShips = [];
-            for (const [k, u] of Object.entries(units)) {
-                if (u.owner === myColor && u.type !== 'BA') {
-                    const [c, r] = k.split(',').map(Number);
-                    myShips.push({ c, r, id: u.id, owner: myColor, type: u.type });
-                }
-            }
-            sendMsg({ type: 'PLAYER_READY', ships: myShips });
-            showToast('Oczekiwanie na przeciwnika...');
-            checkBattleStart();
-        });
-
-        function checkBattleStart() {
-            if (myReady && enemyReady) {
-                phase = 'BATTLE';
-                document.getElementById('setup-overlay').classList.add('hidden');
-                showToast('BITWA ROZPOCZĘTA! Zaczyna Żółty.');
-                renderBoard();
-            }
+            document.getElementById('dock-remaining').textContent = `Pozostało: ${total}`;
+            document.getElementById('btn-confirm-setup').disabled = total > 0 || myReady;
         }
 
         // ==========================================
-        // 6. CLICK & MOVEMENT / COMBAT LOGIC
+        // 5. OBSŁUGA KLIKNIĘĆ I USTAWIANIA
         // ==========================================
-        function onCellClick(c, r) {
-            if (phase === 'SETUP') {
+        function onCellClick(coord, c, r) {
+            if (phase === 'setup') {
                 if (myReady) return;
-                const myPortTerrain = myColor === 'yellow' ? 'yellow-port' : 'red-port';
-                if (getTerrain(c, r) !== myPortTerrain) return;
-
-                const existing = units[key(c, r)];
+                const isMyPort = myColor === 'yellow' ? isYellowPort(c, r) : isRedPort(c, r);
+                if (!isMyPort) {
+                    showToast('Ustawiaj statki wyłącznie we własnym porcie!');
+                    return;
+                }
+                const existing = board[coord];
                 if (existing) {
-                    if (existing.type === 'BA') return; // Cannot remove fixed battery
-                    // Return to dock
+                    if (existing.type === 'BN') {
+                        showToast('Baterie mają stałą pozycję!');
+                        return;
+                    }
+                    // Zwrot statku do doku
                     dockCounts[existing.type]++;
-                    delete units[key(c, r)];
+                    delete board[coord];
                     renderBoard();
                     renderDock();
-                } else if (selectedDockType && dockCounts[selectedDockType] > 0) {
-                    units[key(c, r)] = {
-                        id: `${myColor}-${selectedDockType}-${Math.random().toString(36).substr(2, 5)}`,
-                        owner: myColor,
+                    return;
+                }
+                if (selectedDockType && dockCounts[selectedDockType] > 0) {
+                    board[coord] = {
+                        id: `${myColor}-${selectedDockType}-${Date.now()}-${Math.random()}`,
                         type: selectedDockType,
+                        owner: myColor,
                         revealed: false,
                         neutralTurns: 0
                     };
@@ -755,350 +640,480 @@
                     if (dockCounts[selectedDockType] === 0) selectedDockType = null;
                     renderBoard();
                     renderDock();
+                } else {
+                    showToast('Wybierz statek z Doku!');
                 }
                 return;
             }
 
-            if (phase !== 'BATTLE' || turn !== myColor) return;
-
-            // Mine placement mode
-            if (minePlacementMode) {
-                if (validMoves.some(m => m.c === c && m.r === r)) {
-                    placeMine(c, r);
+            if (phase === 'battle') {
+                if (currentTurn !== myColor) {
+                    showToast('Poczekaj na ruch przeciwnika!');
+                    return;
                 }
-                return;
-            }
+                if (pendingAction) {
+                    showToast('Kliknij Potwierdź lub Anuluj swój ruch!');
+                    return;
+                }
 
-            // Check if clicking a valid attack target
-            if (selectedCell && validAttacks.some(a => a.c === c && a.r === r)) {
-                executeAttack(selectedCell.c, selectedCell.r, c, r);
-                return;
-            }
+                const clickedUnit = board[coord];
 
-            // Check if clicking a valid move target
-            if (selectedCell && validMoves.some(m => m.c === c && m.r === r)) {
-                executeMove(selectedCell.c, selectedCell.r, c, r);
-                return;
-            }
+                // Jeśli mamy już wybrany statek i klikamy w pole ruchu/ataku/miny
+                if (selectedCell) {
+                    const myUnit = board[selectedCell];
+                    if (placingMineMode && myUnit && myUnit.type === 'TR') {
+                        const validMines = getAdjacentMineCells(selectedCell);
+                        if (validMines.has(coord)) {
+                            pendingAction = {
+                                type: 'mine',
+                                from: selectedCell,
+                                to: coord,
+                                snapshot: JSON.parse(JSON.stringify(board))
+                            };
+                            board[coord] = {
+                                id: `${myColor}-MN-${Date.now()}`,
+                                type: 'MN',
+                                owner: myColor,
+                                revealed: false,
+                                neutralTurns: 0
+                            };
+                            placingMineMode = false;
+                            selectedCell = null;
+                            renderBoard();
+                            updateUI();
+                            return;
+                        }
+                    } else if (myUnit && myUnit.owner === myColor && myUnit.type !== 'BN' && myUnit.type !== 'MN') {
+                        const { moves, attacks } = getValidMovesAndAttacks(selectedCell, myUnit);
+                        if (moves.has(coord) || attacks.has(coord)) {
+                            pendingAction = {
+                                type: attacks.has(coord) ? 'attack' : 'move',
+                                from: selectedCell,
+                                to: coord,
+                                snapshot: JSON.parse(JSON.stringify(board))
+                            };
+                            // Podgląd lokalny ruchu
+                            if (moves.has(coord)) {
+                                board[coord] = board[selectedCell];
+                                delete board[selectedCell];
+                            }
+                            selectedCell = null;
+                            renderBoard();
+                            updateUI();
+                            return;
+                        }
+                    }
+                }
 
-            // Select own ship
-            const clickedUnit = units[key(c, r)];
-            if (clickedUnit && clickedUnit.owner === myColor && clickedUnit.type !== 'BA' && clickedUnit.type !== 'MI') {
-                selectedCell = { c, r };
-                calculateValidActions(c, r, clickedUnit);
-                renderBoard();
-            } else {
-                clearSelection();
-                renderBoard();
+                // Zaznaczenie własnej jednostki
+                if (clickedUnit && clickedUnit.owner === myColor) {
+                    selectedCell = coord;
+                    placingMineMode = false; // Reset trybu min przy zmianie jednostki
+                    renderBoard();
+                    updateUI();
+                } else {
+                    selectedCell = null;
+                    placingMineMode = false;
+                    renderBoard();
+                    updateUI();
+                }
             }
         }
 
-        function clearSelection() {
-            selectedCell = null;
-            validMoves = [];
-            validAttacks = [];
-            minePlacementMode = false;
-            document.getElementById('action-bar').classList.add('hidden');
-            document.getElementById('btn-place-mine').classList.add('hidden');
+        // Losowe ustawienie statków w porcie
+        document.getElementById('btn-random-setup').addEventListener('click', () => {
+            if (myReady) return;
+            // Wyczyść własne statki (zostaw baterie)
+            Object.keys(board).forEach(coord => {
+                if (board[coord].owner === myColor && board[coord].type !== 'BN') {
+                    dockCounts[board[coord].type]++;
+                    delete board[coord];
+                }
+            });
+
+            const freePortCells = [];
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const isMyPort = myColor === 'yellow' ? isYellowPort(c, r) : isRedPort(c, r);
+                    const coord = toCoord(c, r);
+                    if (isMyPort && !board[coord]) freePortCells.push(coord);
+                }
+            }
+
+            // Tasowanie
+            freePortCells.sort(() => Math.random() - 0.5);
+
+            Object.keys(dockCounts).forEach(type => {
+                while (dockCounts[type] > 0 && freePortCells.length > 0) {
+                    const coord = freePortCells.pop();
+                    board[coord] = {
+                        id: `${myColor}-${type}-${Date.now()}-${Math.random()}`,
+                        type: type,
+                        owner: myColor,
+                        revealed: false,
+                        neutralTurns: 0
+                    };
+                    dockCounts[type]--;
+                }
+            });
+
+            selectedDockType = null;
+            renderBoard();
+            renderDock();
+        });
+
+        // Potwierdzenie gotowości do bitwy
+        document.getElementById('btn-confirm-setup').addEventListener('click', () => {
+            myReady = true;
+            document.getElementById('btn-confirm-setup').disabled = true;
+            document.getElementById('btn-random-setup').disabled = true;
+
+            // Wyślij swoje ustawienie do przeciwnika
+            const myUnits = {};
+            Object.keys(board).forEach(coord => {
+                if (board[coord].owner === myColor) myUnits[coord] = board[coord];
+            });
+            sendData({ type: 'READY', units: myUnits });
+            checkBothReady();
+        });
+
+        function checkBothReady() {
+            if (myReady && enemyReady) {
+                phase = 'battle';
+                document.getElementById('dock-overlay').classList.add('hidden');
+                showToast('Bitwa rozpoczęta! Zaczyna Gracz Żółty.');
+                renderBoard();
+                updateUI();
+            } else if (myReady) {
+                document.getElementById('turn-indicator').textContent = 'Czekam na wroga...';
+            }
         }
 
-        function isBlockedByEnemyBattery(c, r, owner) {
-            const enemyColor = owner === 'yellow' ? 'red' : 'yellow';
-            for (let dc = -1; dc <= 1; dc++) {
-                for (let dr = -1; dr <= 1; dr++) {
-                    const u = units[key(c + dc, r + dr)];
-                    if (u && u.owner === enemyColor && u.type === 'BA') return true;
+        // ==========================================
+        // 6. LOGIKA RUCHU, BATERII, MIN I WALKI
+        // ==========================================
+        function isBlockedByWall(c1, r1, c2, r2) {
+            const coord1 = toCoord(c1, r1);
+            const coord2 = toCoord(c2, r2);
+            const dc = c2 - c1;
+            const dr = r2 - r1;
+
+            if (dc === 1 && WALLS[coord1]?.has('right')) return true;
+            if (dc === -1 && WALLS[coord1]?.has('left')) return true;
+            if (dr === 1 && WALLS[coord1]?.has('bottom')) return true;
+            if (dr === -1 && WALLS[coord1]?.has('top')) return true;
+
+            if (dc === 1 && WALLS[coord2]?.has('left')) return true;
+            if (dc === -1 && WALLS[coord2]?.has('right')) return true;
+            if (dr === 1 && WALLS[coord2]?.has('top')) return true;
+            if (dr === -1 && WALLS[coord2]?.has('bottom')) return true;
+
+            return false;
+        }
+
+        function isInEnemyBatteryRange(coord, myOwner) {
+            const { c, r } = parseCoord(coord);
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dc === 0 && dr === 0) continue;
+                    const nc = c + dc, nr = r + dr;
+                    if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS) {
+                        const nCoord = toCoord(nc, nr);
+                        const u = board[nCoord];
+                        if (u && u.type === 'BN' && u.owner !== myOwner) return true;
+                    }
                 }
             }
             return false;
         }
 
-        function calculateValidActions(c, r, unit) {
-            validMoves = [];
-            validAttacks = [];
-            const speed = UNIT_TYPES[unit.type].speed;
-            const dirs = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+        function getValidMovesAndAttacks(startCoord, unit) {
+            const moves = new Set();
+            const attacks = new Set();
+            const maxSteps = UNIT_TYPES[unit.type].move;
+            const { c: sc, r: sr } = parseCoord(startCoord);
 
-            for (const [dc, dr] of dirs) {
-                let currC = c;
-                let currR = r;
-                for (let step = 1; step <= speed; step++) {
-                    const nextC = currC + dc;
-                    const nextR = currR + dr;
-                    if (nextC < 0 || nextC >= COLS || nextR < 0 || nextR >= ROWS) break;
-                    if (getTerrain(nextC, nextR) === 'island') break;
+            const dirs = [
+                [-1,-1], [0,-1], [1,-1],
+                [-1, 0],         [1, 0],
+                [-1, 1], [0, 1], [1, 1]
+            ];
 
-                    // Check coastline wall (orthogonal or diagonal)
-                    if (COAST_WALLS.has(`${currC},${currR}-${nextC},${nextR}`)) break;
+            dirs.forEach(([dc, dr]) => {
+                let cc = sc, cr = sr;
+                for (let step = 1; step <= maxSteps; step++) {
+                    const nc = cc + dc;
+                    const nr = cr + dr;
+                    if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
+
+                    const nCoord = toCoord(nc, nr);
+                    if (ISLAND_CELLS.has(nCoord)) break;
+
+                    // Sprawdź ściany (ruch po skosie nie może przeciąć rogu ściany)
                     if (dc !== 0 && dr !== 0) {
-                        if (COAST_WALLS.has(`${currC},${currR}-${nextC},${currR}`) || COAST_WALLS.has(`${currC},${currR}-${currC},${nextR}`)) break;
+                        if (isBlockedByWall(cc, cr, nc, cr) || isBlockedByWall(cc, cr, cc, nr)) break;
+                    } else {
+                        if (isBlockedByWall(cc, cr, nc, nr)) break;
                     }
 
-                    const target = units[key(nextC, nextR)];
+                    const target = board[nCoord];
                     if (target) {
-                        if (target.owner !== myColor) {
-                            // Neutral waters: no combat!
-                            if (getTerrain(nextC, nextR) !== 'neutral' && getTerrain(c, r) !== 'neutral') {
-                                if (target.type === 'BA') {
-                                    // Only Rocket Ship (OR) can attack Battery
-                                    if (unit.type === 'OR') validAttacks.push({ c: nextC, r: nextR });
-                                } else if (unit.type !== 'OD') {
-                                    validAttacks.push({ c: nextC, r: nextR });
-                                }
+                        if (target.owner !== unit.owner) {
+                            // Na wodach neutralnych nie można atakować
+                            if (!NEUTRAL_CELLS.has(nCoord) && !NEUTRAL_CELLS.has(startCoord)) {
+                                if (unit.type !== 'OD') attacks.add(nCoord);
                             }
                         }
-                        break; // Cannot jump over any unit
+                        break; // Nie można przeskakiwać jednostek
                     } else {
-                        // Cannot enter enemy battery range
-                        if (!isBlockedByEnemyBattery(nextC, nextR, myColor)) {
-                            validMoves.push({ c: nextC, r: nextR });
+                        // Bateria blokuje przejście (chyba że to Okręt rakietowy atakujący baterię, ale tu pole jest puste)
+                        if (isInEnemyBatteryRange(nCoord, unit.owner) && unit.type !== 'OR') {
+                            break;
                         }
+                        moves.add(nCoord);
                     }
-                    currC = nextC;
-                    currR = nextR;
+                    cc = nc; cr = nr;
                 }
-            }
+            });
 
-            // Trałowiec mine button
-            if (unit.type === 'TR' && myMinesRemaining > 0) {
-                document.getElementById('action-bar').classList.remove('hidden');
-                document.getElementById('btn-place-mine').classList.remove('hidden');
-            } else {
-                document.getElementById('action-bar').classList.add('hidden');
-            }
+            return { moves, attacks };
         }
 
-        document.getElementById('btn-place-mine').addEventListener('click', () => {
-            if (!selectedCell) return;
-            minePlacementMode = true;
-            validMoves = [];
-            validAttacks = [];
-            const { c, r } = selectedCell;
-            for (let dc = -1; dc <= 1; dc++) {
-                for (let dr = -1; dr <= 1; dr++) {
+        function getAdjacentMineCells(coord) {
+            const res = new Set();
+            const { c, r } = parseCoord(coord);
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
                     if (dc === 0 && dr === 0) continue;
                     const nc = c + dc, nr = r + dr;
                     if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS) {
-                        if (getTerrain(nc, nr) === 'sea' && !units[key(nc, nr)] && !COAST_WALLS.has(`${c},${r}-${nc},${nr}`)) {
-                            validMoves.push({ c: nc, r: nr });
+                        const nCoord = toCoord(nc, nr);
+                        if (!ISLAND_CELLS.has(nCoord) && !NEUTRAL_CELLS.has(nCoord) && !board[nCoord]) {
+                            res.add(nCoord);
                         }
                     }
                 }
             }
-            renderBoard();
-        });
-
-        document.getElementById('btn-cancel-action').addEventListener('click', () => {
-            clearSelection();
-            renderBoard();
-        });
-
-        function placeMine(c, r) {
-            units[key(c, r)] = {
-                id: `${myColor}-MI-${Date.now()}`,
-                owner: myColor,
-                type: 'MI',
-                revealed: false
-            };
-            myMinesRemaining--;
-            sendMsg({ type: 'PLACE_MINE', c, r, unit: units[key(c, r)] });
-            clearSelection();
-            renderBoard();
-            showToast(`Postawiono minę! Pozostało: ${myMinesRemaining}`);
+            return res;
         }
 
-        function executeMove(fromC, fromR, toC, toR) {
-            const unit = units[key(fromC, fromR)];
-            delete units[key(fromC, fromR)];
-            units[key(toC, toR)] = unit;
-
-            // Check Neutral Waters counter
-            if (getTerrain(toC, toR) === 'neutral') {
-                unit.neutralTurns = (unit.neutralTurns || 0) + 1;
-            } else {
-                unit.neutralTurns = 0;
+        // Rozstrzyganie walki: zwraca 'attacker' | 'defender' | 'both'
+        function resolveCombat(att, def) {
+            if (def.type === 'MN') {
+                return att.type === 'TR' ? 'attacker' : 'both';
             }
-
-            // Check Victory: Landing Ship (OD) reaching enemy port entrance
-            const enemyEntrances = myColor === 'yellow' ? RED_ENTRANCES : YELLOW_ENTRANCES;
-            if (unit.type === 'OD' && enemyEntrances.some(e => e.c === toC && e.r === toR)) {
-                sendMsg({ type: 'MOVE', fromC, fromR, toC, toR });
-                endGame(myColor, 'Okręt desantowy dotarł do portu przeciwnika!');
-                return;
+            if (def.type === 'BN') {
+                return att.type === 'OR' ? 'attacker' : 'defender';
             }
+            if (att.type === def.type) return 'both';
 
-            sendMsg({ type: 'MOVE', fromC, fromR, toC, toR });
-            endTurn();
-        }
-
-        function resolveCombat(attackerType, defenderType) {
-            if (defenderType === 'BA') return attackerType === 'OR' ? 'attacker' : 'defender';
-            if (defenderType === 'MI') return attackerType === 'TR' ? 'attacker' : 'both';
-            if (attackerType === defenderType) return 'both';
-            if (attackerType === 'OD') return 'defender';
-            if (defenderType === 'OD') return 'attacker';
-
-            // Specific rules from table
-            const beats = {
-                PA: ['OR', 'KR', 'NI', 'ES', 'TR', 'OD'],
-                OR: ['KR', 'NI', 'ES', 'TR', 'OD', 'BA'],
+            const rules = {
+                PN: ['OR', 'KR', 'NI', 'ES', 'TR', 'OD'],
+                OR: ['KR', 'NI', 'ES', 'TR', 'OD'],
                 KR: ['NI', 'ES', 'TR', 'OD'],
-                NI: ['OP', 'ES', 'TR', 'OD'], // NI beats OP if NI attacks first
-                OP: ['PA', 'OR', 'KR', 'NI', 'TR', 'OD'], // OP beats NI if OP attacks first
+                NI: ['OP', 'ES', 'TR', 'OD'], // Niszczyciel bije OP gdy atakuje pierwszy
+                OP: ['PN', 'OR', 'KR', 'NI'], // OP bije NI gdy atakuje pierwszy
                 ES: ['OP', 'TR', 'OD'],
-                TR: ['OD']
+                TR: ['OD'],
+                OD: []
             };
-            if (beats[attackerType] && beats[attackerType].includes(defenderType)) return 'attacker';
-            return 'defender';
+            return rules[att.type]?.includes(def.type) ? 'attacker' : 'defender';
         }
 
-        function executeAttack(fromC, fromR, toC, toR) {
-            const attacker = units[key(fromC, fromR)];
-            const defender = units[key(toC, toR)];
-            const outcome = resolveCombat(attacker.type, defender.type);
-
-            attacker.revealed = true;
-            defender.revealed = true;
-
-            if (outcome === 'attacker') {
-                delete units[key(fromC, fromR)];
-                units[key(toC, toR)] = attacker;
-                showToast(`Wygrana walka! ${attacker.type} zniszczył ${defender.type}`);
-            } else if (outcome === 'defender') {
-                delete units[key(fromC, fromR)];
-                showToast(`Przegrana walka! ${defender.type} zniszczył ${attacker.type}`);
-            } else {
-                delete units[key(fromC, fromR)];
-                delete units[key(toC, toR)];
-                showToast(`Remis! Obie jednostki (${attacker.type}) zniszczone.`);
-            }
-
-            sendMsg({ type: 'ATTACK', fromC, fromR, toC, toR, outcome });
-            checkLossConditions();
-            endTurn();
-        }
-
-        function endTurn() {
-            clearSelection();
-            // Check internment on neutral waters for the player whose turn just ended
-            for (const [k, u] of Object.entries(units)) {
-                if (u.owner === turn && u.neutralTurns >= 4) {
-                    delete units[k];
-                    showToast('Okręt internowany na wodach neutralnych!');
-                }
-            }
-            turn = turn === 'yellow' ? 'red' : 'yellow';
+        // ==========================================
+        // 7. POTWIERDZANIE / ANULOWANIE TURY
+        // ==========================================
+        document.getElementById('btn-place-mine').addEventListener('click', () => {
+            if (!selectedCell || board[selectedCell]?.type !== 'TR') return;
+            placingMineMode = !placingMineMode;
             renderBoard();
-        }
+        });
 
-        function checkLossConditions() {
-            for (const color of ['yellow', 'red']) {
-                const playerUnits = Object.values(units).filter(u => u.owner === color);
-                const hasOD = playerUnits.some(u => u.type === 'OD');
-                const hasOR = playerUnits.some(u => u.type === 'OR');
-                const winner = color === 'yellow' ? 'red' : 'yellow';
-                if (!hasOD) {
-                    endGame(winner, `Gracz ${color === 'yellow' ? 'Żółty' : 'Czerwony'} stracił Okręt Desantowy!`);
-                    return;
-                }
-                if (!hasOR) {
-                    endGame(winner, `Gracz ${color === 'yellow' ? 'Żółty' : 'Czerwony'} stracił wszystkie Okręty Rakietowe!`);
-                    return;
-                }
-            }
-        }
+        document.getElementById('btn-cancel-turn').addEventListener('click', () => {
+            if (!pendingAction) return;
+            board = pendingAction.snapshot;
+            pendingAction = null;
+            selectedCell = null;
+            renderBoard();
+            updateUI();
+        });
 
-        function endGame(winnerColor, reason) {
-            phase = 'GAMEOVER';
-            const modal = document.getElementById('modal-gameover');
-            document.getElementById('gameover-title').textContent = winnerColor === myColor ? 'ZWYCIĘSTWO!' : 'PORAŻKA!';
-            document.getElementById('gameover-icon').textContent = winnerColor === myColor ? '🏆' : '💥';
-            document.getElementById('gameover-reason').textContent = reason;
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
+        document.getElementById('btn-confirm-turn').addEventListener('click', () => {
+            if (!pendingAction) return;
+            const act = pendingAction;
+            board = act.snapshot; // Przywróć czysty stan przed wykonaniem finalnej akcji
 
-        // ==========================================
-        // 7. NETWORK MESSAGE HANDLER
-        // ==========================================
-        function handleNetworkMessage(data) {
-            if (data.type === 'PLAYER_READY') {
-                enemyReady = true;
-                data.ships.forEach(s => {
-                    units[key(s.c, s.r)] = {
-                        id: s.id,
-                        owner: s.owner,
-                        type: s.type,
-                        revealed: false,
-                        neutralTurns: 0
-                    };
-                });
-                checkBattleStart();
-            } else if (data.type === 'MOVE') {
-                const u = units[key(data.fromC, data.fromR)];
-                delete units[key(data.fromC, data.fromR)];
-                units[key(data.toC, data.toR)] = u;
-                const myEntrances = myColor === 'yellow' ? YELLOW_ENTRANCES : RED_ENTRANCES;
-                if (u.type === 'OD' && myEntrances.some(e => e.c === data.toC && e.r === data.toR)) {
-                    endGame(u.owner, 'Przeciwnik wprowadził Okręt Desantowy do Twojego portu!');
-                    return;
-                }
-                endTurn();
-            } else if (data.type === 'ATTACK') {
-                const attacker = units[key(data.fromC, data.fromR)];
-                const defender = units[key(data.toC, data.toR)];
-                attacker.revealed = true;
-                defender.revealed = true;
-                if (data.outcome === 'attacker') {
-                    delete units[key(data.fromC, data.fromR)];
-                    units[key(data.toC, data.toR)] = attacker;
-                } else if (data.outcome === 'defender') {
-                    delete units[key(data.fromC, data.fromR)];
+            if (act.type === 'mine') {
+                board[act.to] = {
+                    id: `${myColor}-MN-${Date.now()}`,
+                    type: 'MN',
+                    owner: myColor,
+                    revealed: false,
+                    neutralTurns: 0
+                };
+                showToast('Postawiono minę!');
+            } else if (act.type === 'move') {
+                board[act.to] = board[act.from];
+                delete board[act.from];
+                updateNeutralTurns(act.to);
+            } else if (act.type === 'attack') {
+                const att = board[act.from];
+                const def = board[act.to];
+                att.revealed = true;
+                def.revealed = true;
+                const result = resolveCombat(att, def);
+
+                if (result === 'attacker') {
+                    board[act.to] = att;
+                    delete board[act.from];
+                    showToast(`Wygrana! ${UNIT_TYPES[att.type].name} niszczy ${UNIT_TYPES[def.type].name}.`);
+                } else if (result === 'defender') {
+                    delete board[act.from];
+                    showToast(`Porażka! ${UNIT_TYPES[att.type].name} ulega ${UNIT_TYPES[def.type].name}.`);
                 } else {
-                    delete units[key(data.fromC, data.fromR)];
-                    delete units[key(data.toC, data.toR)];
+                    delete board[act.from];
+                    delete board[act.to];
+                    showToast(`Remis! Obie jednostki (${UNIT_TYPES[att.type].name} i ${UNIT_TYPES[def.type].name}) toną.`);
                 }
-                checkLossConditions();
-                endTurn();
-            } else if (data.type === 'PLACE_MINE') {
-                units[key(data.c, data.r)] = data.unit;
-                renderBoard();
             }
-        }
 
-        // ==========================================
-        // 8. UI HELPERS
-        // ==========================================
-        function updateTurnIndicator() {
-            const el = document.getElementById('turn-indicator');
-            if (!el) return;
-            if (phase === 'SETUP') {
-                el.innerHTML = `<span class="text-[8px] sm:text-[10px]">USTAW</span>`;
+            pendingAction = null;
+            selectedCell = null;
+            currentTurn = currentTurn === 'yellow' ? 'red' : 'yellow';
+
+            sendData({ type: 'SYNC_BOARD', board, currentTurn });
+            checkWinConditions();
+            renderBoard();
+            updateUI();
+        });
+
+        function updateNeutralTurns(coord) {
+            const u = board[coord];
+            if (!u) return;
+            if (NEUTRAL_CELLS.has(coord)) {
+                u.neutralTurns = (u.neutralTurns || 0) + 1;
+                if (u.neutralTurns >= 4) {
+                    delete board[coord];
+                    showToast(`${UNIT_TYPES[u.type].name} został internowany na wodach neutralnych!`);
+                }
             } else {
-                el.innerHTML = turn === 'yellow'
-                    ? `<span class="px-1 rounded bg-yellow-400 text-slate-950 font-black text-[8px] sm:text-[10px]">ŻÓŁTY</span>`
-                    : `<span class="px-1 rounded bg-red-600 text-white font-black text-[8px] sm:text-[10px]">CZERW.</span>`;
+                u.neutralTurns = 0;
             }
         }
 
-        function updateConnectionStatus(connected) {
-            const el = document.getElementById('conn-indicator');
-            if (!el) return;
-            el.innerHTML = connected
-                ? `<i class="fa-solid fa-wifi text-emerald-300"></i>`
-                : `<i class="fa-solid fa-wifi text-red-500"></i>`;
+        function checkWinConditions() {
+            // 1. Czy Okręt desantowy dotarł do wejścia wroga?
+            const targetEntrances = myColor === 'yellow' ? RED_ENTRANCES : YELLOW_ENTRANCES;
+            for (const ent of targetEntrances) {
+                if (board[ent]?.type === 'OD' && board[ent]?.owner === myColor) {
+                    endGame(myColor, 'Okręt desantowy bezpiecznie wpłynął do portu przeciwnika!');
+                    return;
+                }
+            }
+
+            // 2. Policz OD i OR obu graczy
+            const counts = { yellow: { OD: 0, OR: 0 }, red: { OD: 0, OR: 0 } };
+            Object.values(board).forEach(u => {
+                if (u.type === 'OD') counts[u.owner].OD++;
+                if (u.type === 'OR') counts[u.owner].OR++;
+            });
+
+            if (counts.yellow.OD === 0) endGame('red', 'Gracz Żółty stracił Okręt desantowy!');
+            else if (counts.red.OD === 0) endGame('yellow', 'Gracz Czerwony stracił Okręt desantowy!');
+            else if (counts.yellow.OR === 0) endGame('red', 'Gracz Żółty stracił wszystkie Okręty rakietowe!');
+            else if (counts.red.OR === 0) endGame('yellow', 'Gracz Czerwony stracił wszystkie Okręty rakietowe!');
         }
 
+        function endGame(winner, reason) {
+            phase = 'gameover';
+            document.getElementById('gameover-title').textContent = winner === myColor ? 'ZWYCIĘSTWO!' : 'PORAŻKA!';
+            document.getElementById('gameover-reason').textContent = reason;
+            document.getElementById('modal-gameover').classList.remove('hidden');
+        }
+
+        // ==========================================
+        // 8. ODBIÓR DANYCH Z SIECI
+        // ==========================================
+        function handleNetworkData(data) {
+            if (data.type === 'READY') {
+                Object.keys(data.units).forEach(coord => {
+                    board[coord] = data.units[coord];
+                });
+                enemyReady = true;
+                checkBothReady();
+            } else if (data.type === 'SYNC_BOARD') {
+                board = data.board;
+                currentTurn = data.currentTurn;
+                checkWinConditions();
+                renderBoard();
+                updateUI();
+            }
+        }
+
+        // ==========================================
+        // 9. AKTUALIZACJA PANELU INFORMACYJNEGO
+        // ==========================================
+        function updateUI() {
+            const turnEl = document.getElementById('turn-indicator');
+            if (phase === 'setup') {
+                turnEl.textContent = myReady ? 'Czekam na wroga...' : 'Faza ustawiania';
+                turnEl.className = 'w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs bg-slate-700 text-white border border-slate-600';
+            } else if (phase === 'battle') {
+                const isMyTurn = currentTurn === myColor;
+                turnEl.textContent = isMyTurn ? 'TWOJA TURA' : 'TURA WROGA';
+                turnEl.className = `w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs border ${
+                    currentTurn === 'yellow'
+                        ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500'
+                        : 'bg-red-500/20 text-red-300 border-red-500'
+                }`;
+            }
+
+            // Panel wybranej jednostki
+            const nameEl = document.getElementById('selected-unit-name');
+            const descEl = document.getElementById('selected-unit-desc');
+            const badgeEl = document.getElementById('selected-unit-badge');
+            const mineBtn = document.getElementById('btn-place-mine');
+
+            if (selectedCell && board[selectedCell]) {
+                const u = board[selectedCell];
+                const info = UNIT_TYPES[u.type];
+                badgeEl.classList.remove('hidden');
+                badgeEl.textContent = u.type;
+                badgeEl.className = `mb-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    u.owner === 'yellow' ? 'bg-yellow-500 text-slate-950' : 'bg-red-600 text-white'
+                }`;
+                nameEl.textContent = info.name;
+                descEl.textContent = info.desc;
+
+                if (u.type === 'TR' && u.owner === myColor && currentTurn === myColor && !pendingAction) {
+                    mineBtn.classList.remove('hidden');
+                } else {
+                    mineBtn.classList.add('hidden');
+                }
+            } else {
+                badgeEl.classList.add('hidden');
+                nameEl.textContent = pendingAction ? 'Ruch gotowy' : 'Wybierz jednostkę';
+                descEl.textContent = pendingAction
+                    ? 'Kliknij Potwierdź, aby zakończyć turę, lub Anuluj, aby cofnąć.'
+                    : 'Kliknij swój statek na planszy, aby zobaczyć jego ruch i siłę.';
+                mineBtn.classList.add('hidden');
+            }
+
+            document.getElementById('btn-confirm-turn').disabled = !pendingAction;
+            document.getElementById('btn-cancel-turn').disabled = !pendingAction;
+        }
+
+        // ==========================================
+        // 10. MODALE I POWIADOMIENIA
+        // ==========================================
         function openModal(id) {
-            const m = document.getElementById(id);
-            m.classList.remove('hidden');
-            m.classList.add('flex');
+            document.getElementById(id).classList.remove('hidden');
         }
         function closeModal(id) {
-            const m = document.getElementById(id);
-            m.classList.add('hidden');
-            m.classList.remove('flex');
+            document.getElementById(id).classList.add('hidden');
         }
+        window.openModal = openModal;
+        window.closeModal = closeModal;
 
         let toastTimer = null;
         function showToast(msg) {
