@@ -228,11 +228,14 @@
         let conn = null;
         let myRole = TEAM_YELLOW; // Domyślnie Host = Żółty, Dołączający = Czerwony
 
+        // Konfiguracja serwerów STUN (Google) dla połączeń między sieciami (LTE/Wi-Fi)
         const PEER_CONFIG = {
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' }
                 ]
             }
         };
@@ -267,13 +270,13 @@
                 conn = c;
                 setupNetEvents();
                 document.getElementById('net-status').innerText = `Połączono! Jesteś ŻÓŁTY (Host)`;
-                document.getElementById('action-prompt').innerText = `Gracz Czerwony dołączył! Możecie rozstawić jednostki.`;
+                document.getElementById('action-prompt').innerText = `Gracz Czerwony dołączył! Rozstawcie jednostki i rozpocznijcie bitwę.`;
                 syncNetwork();
             });
 
             peer.on('error', (err) => {
-                console.error(err);
-                document.getElementById('net-status').innerText = 'Błąd serwera. Spróbuj ponowie.';
+                console.error('Błąd PeerJS Host:', err);
+                document.getElementById('net-status').innerText = 'Błąd połączenia. Spróbuj ponownie.';
             });
         }
 
@@ -293,11 +296,22 @@
                 let targetId = 'morskie-room-' + code;
                 conn = peer.connect(targetId, { reliable: true });
                 myRole = TEAM_RED;
-                setupNetEvents();
+
+                let timeout = setTimeout(() => {
+                    if (!conn || !conn.open) {
+                        document.getElementById('net-status').innerText = 'Nie znaleziono pokoju!';
+                        document.getElementById('action-prompt').innerText = 'Upewnij się, że pierwszy gracz stworzył pokój i kod jest poprawny.';
+                    }
+                }, 8000);
+
+                conn.on('open', () => {
+                    clearTimeout(timeout);
+                    setupNetEvents();
+                });
             });
 
             peer.on('error', (err) => {
-                console.error(err);
+                console.error('Błąd PeerJS Joiner:', err);
                 document.getElementById('net-status').innerText = 'Nie znaleziono pokoju!';
             });
         }
