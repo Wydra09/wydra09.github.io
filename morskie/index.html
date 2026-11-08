@@ -334,7 +334,57 @@
 
         // ==========================================
         // 1. STAŁE I DEFINICJE JEDNOSTEK
-// ... existing code ... -->
+        // ==========================================
+        const COLS = 'ABCDEFGHIJKLMNOPQR'.split('');
+        const ROWS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+        const UNIT_TYPES = {
+            PN: { name: 'Pancernik', range: 2, count: 3, desc: 'Zasięg 2. Ulega tylko Okrętowi podwodnemu (OP).' },
+            OR: { name: 'Okręt rakietowy', range: 1, count: 3, desc: 'Zasięg 1. Ulega PN i OP. Jedyny niszczy Baterie nabrzeżne (BN).' },
+            KR: { name: 'Krążownik', range: 2, count: 3, desc: 'Zasięg 2. Ulega PN, OR i OP.' },
+            NI: { name: 'Niszczyciel', range: 4, count: 4, desc: 'Zasięg 4. Ulega PN, OR, KR oraz OP (gdy OP atakuje pierwszy).' },
+            OP: { name: 'Okręt podwodny', range: 2, count: 4, desc: 'Zasięg 2. Ulega ES oraz NI (gdy NI atakuje pierwszy).' },
+            ES: { name: 'Eskortowiec', range: 3, count: 4, desc: 'Zasięg 3. Ulega wszystkim oprócz OP i TR.' },
+            TR: { name: 'Trałowiec', range: 2, count: 4, desc: 'Zasięg 2. Ulega wszystkim. Stawia i usuwa Miny.' },
+            OD: { name: 'Okręt desantowy', range: 1, count: 1, desc: 'Zasięg 1. Ulega wszystkim. Nie atakuje. Musi wpłynąć do portu wroga!' },
+            BN: { name: 'Bateria nabrzeżna', range: 0, count: 0, desc: 'Stała. Blokuje i bije wroga w zasięgu 1 pola (oprócz OR).' },
+            MN: { name: 'Mina', range: 0, count: 0, desc: 'Stała. Zaatakowana niszczy każdy okręt oprócz Trałowca (TR).' }
+        };
+
+        // Porty (Żółty: A-D, 1-12; Czerwony: O-R, 1-12)
+        const YELLOW_PORT_COLS = new Set(['A', 'B', 'C', 'D']);
+        const RED_PORT_COLS = new Set(['O', 'P', 'Q', 'R']);
+
+        // Wyspa na środku: I6, J6, I7, J7
+        const ISLAND_CELLS = new Set(['I6', 'J6', 'I7', 'J7']);
+
+        // Wody neutralne wokół wyspy (H5-K8 bez wyspy)
+        const NEUTRAL_CELLS = new Set([
+            'H5', 'I5', 'J5', 'K5',
+            'H6', 'K6',
+            'H7', 'K7',
+            'H8', 'I8', 'J8', 'K8'
+        ]);
+
+        // Baterie nabrzeżne (stałe pozycje przy wejściach do portów)
+        const YELLOW_BATTERIES = ['D2', 'D4', 'B9', 'B11'];
+        const RED_BATTERIES = ['Q2', 'Q4', 'O9', 'O11'];
+
+        // Białe linie brzegowe (krawędzie blokujące ruch)
+        // Format: 'COORD:DIR' gdzie DIR to 'R' (right), 'L' (left), 'T' (top), 'B' (bottom)
+        const WALLS = new Set([
+            // Port żółty: ściana między D a E (oprócz D3), oraz między A-D12 a resztą, i B10 wejście
+            'D1:R', 'E1:L', 'D2:R', 'E2:L', 'D4:R', 'E4:L', 'D5:R', 'E5:L',
+            'D6:R', 'E6:L', 'D7:R', 'E7:L', 'D8:R', 'E8:L', 'D9:R', 'E9:L',
+            'B9:R', 'C9:L', 'B11:R', 'C11:L', 'B12:R', 'C12:L',
+            'C8:B', 'C9:T', 'D8:B', 'D9:T',
+            // Port czerwony: ściana między N a O (oprócz O10), oraz Q3 wejście
+            'O1:L', 'N1:R', 'O2:L', 'N2:R', 'O4:L', 'N4:R', 'O5:L', 'N5:R',
+            'O6:L', 'N6:R', 'O7:L', 'N7:R', 'O8:L', 'N8:R', 'O9:L', 'N9:R',
+            'Q9:L', 'P9:R', 'Q11:L', 'P11:R', 'Q12:L', 'P12:R',
+            'O8:B', 'O9:T', 'P8:B', 'P9:T'
+        ]);
+
         // ==========================================
         // 2. STAN GRY I POŁĄCZENIE FIREBASE
         // ==========================================
@@ -551,6 +601,622 @@
 
         // ==========================================
         // 4. INICJALIZACJA PLANSZY I DOKU
+        // ==========================================
+        function initGame() {
+            phase = 'setup';
+            board = {};
+            dockCounts = {};
+            Object.keys(UNIT_TYPES).forEach(t => {
+                if (UNIT_TYPES[t].count > 0) dockCounts[t] = UNIT_TYPES[t].count;
+            });
+
+            // Ustawienie baterii nabrzeżnych obu graczy
+            YELLOW_BATTERIES.forEach((c, idx) => {
+                board[c] = { id: `yb_${idx}`, type: 'BN', owner: 'yellow', revealed: true, neutralTurns: 0 };
+            });
+            RED_BATTERIES.forEach((c, idx) => {
+                board[c] = { id: `rb_${idx}`, type: 'BN', owner: 'red', revealed: true, neutralTurns: 0 };
+            });
+
+            const dockOverlay = document.getElementById('dock-overlay');
+            dockOverlay.classList.remove('hidden');
+            if (myColor === 'yellow') {
+                dockOverlay.style.right = '4px';
+                dockOverlay.style.left = 'auto';
+            } else {
+                dockOverlay.style.left = '4px';
+                dockOverlay.style.right = 'auto';
+            }
+
+            renderDock();
+            renderBoard();
+            updateUI();
+        }
+
+        function renderDock() {
+            const list = document.getElementById('dock-list');
+            list.innerHTML = '';
+            let totalLeft = 0;
+
+            Object.keys(dockCounts).forEach(type => {
+                const count = dockCounts[type];
+                totalLeft += count;
+                const info = UNIT_TYPES[type];
+
+                const btn = document.createElement('button');
+                btn.className = `w-full flex items-center justify-between px-2 py-1 rounded-lg border text-left transition ${
+                    selectedDockType === type
+                        ? 'bg-sky-600/40 border-sky-400 text-white'
+                        : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
+                } ${count === 0 ? 'opacity-40 cursor-not-allowed' : ''}`;
+                btn.disabled = count === 0;
+                btn.innerHTML = `
+                    <div class="truncate pr-1">
+                        <span class="font-extrabold text-[11px] text-amber-300">${type}</span>
+                        <span class="text-[10px] sm:text-xs ml-1">${info.name}</span>
+                    </div>
+                    <span class="text-[11px] font-bold bg-slate-900 px-1.5 py-0.5 rounded">${count}</span>
+                `;
+                btn.onclick = () => {
+                    selectedDockType = (selectedDockType === type) ? null : type;
+                    renderDock();
+                };
+                list.appendChild(btn);
+            });
+
+            document.getElementById('dock-remaining').textContent = `Pozostało: ${totalLeft}`;
+            document.getElementById('btn-confirm-setup').disabled = totalLeft > 0 || myReady;
+        }
+
+        document.getElementById('btn-random-setup').addEventListener('click', () => {
+            if (myReady) return;
+            // Zwróć wszystkie własne statki do doku
+            Object.keys(board).forEach(c => {
+                if (board[c].owner === myColor && board[c].type !== 'BN') {
+                    dockCounts[board[c].type]++;
+                    delete board[c];
+                }
+            });
+
+            // Zbierz wolne pola w swoim porcie
+            const portCols = myColor === 'yellow' ? YELLOW_PORT_COLS : RED_PORT_COLS;
+            const freeCells = [];
+            ROWS.forEach(r => {
+                COLS.forEach(col => {
+                    const coord = `${col}${r}`;
+                    if (portCols.has(col) && !board[coord]) {
+                        freeCells.push(coord);
+                    }
+                });
+            });
+
+            // Pomieszaj pola
+            for (let i = freeCells.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [freeCells[i], freeCells[j]] = [freeCells[j], freeCells[i]];
+            }
+
+            // Rozstaw wszystkie statki
+            let idx = 0;
+            Object.keys(dockCounts).forEach(type => {
+                while (dockCounts[type] > 0 && idx < freeCells.length) {
+                    const c = freeCells[idx++];
+                    board[c] = {
+                        id: `${myColor}_${type}_${Math.random().toString(36).slice(2, 7)}`,
+                        type,
+                        owner: myColor,
+                        revealed: false,
+                        neutralTurns: 0
+                    };
+                    dockCounts[type]--;
+                }
+            });
+
+            selectedDockType = null;
+            renderDock();
+            renderBoard();
+        });
+
+        document.getElementById('btn-confirm-setup').addEventListener('click', () => {
+            if (myReady) return;
+            myReady = true;
+            document.getElementById('btn-confirm-setup').disabled = true;
+            document.getElementById('btn-random-setup').disabled = true;
+
+            const myUnits = {};
+            Object.keys(board).forEach(c => {
+                if (board[c].owner === myColor && board[c].type !== 'BN') {
+                    myUnits[c] = board[c];
+                }
+            });
+
+            sendData({ type: 'READY', units: myUnits });
+            checkBothReady();
+            updateUI();
+        });
+
+        function checkBothReady() {
+            if (myReady && enemyReady && phase === 'setup') {
+                phase = 'battle';
+                currentTurn = 'yellow';
+                turnNumber = 1;
+                document.getElementById('dock-overlay').classList.add('hidden');
+                showToast('Obaj gracze gotowi! Zaczyna Gracz Żółty.');
+                renderBoard();
+                updateUI();
+            }
+        }
+
+        // ==========================================
+        // 5. RENDEROWANIE PLANSZY I RUCHY
+        // ==========================================
+        function getCellCoords(coord) {
+            const col = coord[0];
+            const row = parseInt(coord.slice(1), 10);
+            return { cIdx: COLS.indexOf(col), rIdx: row - 1 };
+        }
+
+        function coordsToName(cIdx, rIdx) {
+            if (cIdx < 0 || cIdx >= 18 || rIdx < 0 || rIdx >= 12) return null;
+            return `${COLS[cIdx]}${rIdx + 1}`;
+        }
+
+        function isBlockedByWall(from, to) {
+            const f = getCellCoords(from);
+            const t = getCellCoords(to);
+            const dc = t.cIdx - f.cIdx;
+            const dr = t.rIdx - f.rIdx;
+
+            if (dc === 1 && dr === 0) return WALLS.has(`${from}:R`);
+            if (dc === -1 && dr === 0) return WALLS.has(`${from}:L`);
+            if (dc === 0 && dr === 1) return WALLS.has(`${from}:B`);
+            if (dc === 0 && dr === -1) return WALLS.has(`${from}:T`);
+
+            // Ruch po skosie: blokuj, jeśli któraś z krawędzi narożnika ma ścianę
+            if (Math.abs(dc) === 1 && Math.abs(dr) === 1) {
+                const mid1 = coordsToName(f.cIdx + dc, f.rIdx);
+                const mid2 = coordsToName(f.cIdx, f.rIdx + dr);
+                if (dc === 1 && dr === 1) {
+                    return WALLS.has(`${from}:R`) || WALLS.has(`${from}:B`) ||
+                           (mid1 && WALLS.has(`${mid1}:B`)) || (mid2 && WALLS.has(`${mid2}:R`));
+                }
+                if (dc === 1 && dr === -1) {
+                    return WALLS.has(`${from}:R`) || WALLS.has(`${from}:T`) ||
+                           (mid1 && WALLS.has(`${mid1}:T`)) || (mid2 && WALLS.has(`${mid2}:R`));
+                }
+                if (dc === -1 && dr === 1) {
+                    return WALLS.has(`${from}:L`) || WALLS.has(`${from}:B`) ||
+                           (mid1 && WALLS.has(`${mid1}:B`)) || (mid2 && WALLS.has(`${mid2}:L`));
+                }
+                if (dc === -1 && dr === -1) {
+                    return WALLS.has(`${from}:L`) || WALLS.has(`${from}:T`) ||
+                           (mid1 && WALLS.has(`${mid1}:T`)) || (mid2 && WALLS.has(`${mid2}:L`));
+                }
+            }
+            return false;
+        }
+
+        function getValidMoves(fromCoord) {
+            const unit = board[fromCoord];
+            if (!unit || unit.type === 'BN' || unit.type === 'MN') return { moves: new Set(), attacks: new Set() };
+
+            const range = UNIT_TYPES[unit.type].range;
+            const start = getCellCoords(fromCoord);
+            const moves = new Set();
+            const attacks = new Set();
+
+            const dirs = [
+                [1, 0], [-1, 0], [0, 1], [0, -1],
+                [1, 1], [1, -1], [-1, 1], [-1, -1]
+            ];
+
+            dirs.forEach(([dc, dr]) => {
+                let curr = fromCoord;
+                let currC = start.cIdx;
+                let currR = start.rIdx;
+
+                for (let step = 1; step <= range; step++) {
+                    const nextC = currC + dc;
+                    const nextR = currR + dr;
+                    const next = coordsToName(nextC, nextR);
+                    if (!next) break;
+                    if (ISLAND_CELLS.has(next)) break;
+
+                    const target = board[next];
+                    const wallBlocked = isBlockedByWall(curr, next);
+
+                    // Specjalna zasada: Okręt rakietowy (OR) może zbić Baterię nabrzeżną (BN) przez linię brzegową!
+                    if (wallBlocked) {
+                        if (unit.type === 'OR' && target && target.owner !== unit.owner && target.type === 'BN') {
+                            attacks.add(next);
+                        }
+                        break;
+                    }
+
+                    if (target) {
+                        if (target.owner !== unit.owner) {
+                            // Na wodach neutralnych nie można atakować, a OD nie atakuje nikogo
+                            if (!NEUTRAL_CELLS.has(next) && !NEUTRAL_CELLS.has(fromCoord) && unit.type !== 'OD') {
+                                // Baterię nabrzeżną może zaatakować tylko OR
+                                if (target.type !== 'BN' || unit.type === 'OR') {
+                                    attacks.add(next);
+                                }
+                            }
+                        }
+                        break; // Nie można przeskakiwać jednostek
+                    } else {
+                        moves.add(next);
+                    }
+
+                    curr = next;
+                    currC = nextC;
+                    currR = nextR;
+                }
+            });
+
+            return { moves, attacks };
+        }
+
+        function getValidMineCells(fromCoord) {
+            const cells = new Set();
+            const start = getCellCoords(fromCoord);
+            const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+            dirs.forEach(([dc, dr]) => {
+                const next = coordsToName(start.cIdx + dc, start.rIdx + dr);
+                if (!next) return;
+                if (ISLAND_CELLS.has(next) || NEUTRAL_CELLS.has(next)) return;
+                if (isBlockedByWall(fromCoord, next)) return;
+                if (!board[next]) cells.add(next);
+            });
+            return cells;
+        }
+
+        function renderBoard() {
+            const grid = document.getElementById('board-grid');
+            grid.innerHTML = '';
+
+            let validMoves = new Set();
+            let validAttacks = new Set();
+            let validMines = new Set();
+
+            if (phase === 'battle' && currentTurn === myColor && selectedCell && board[selectedCell] && board[selectedCell].owner === myColor) {
+                if (placingMineMode) {
+                    validMines = getValidMineCells(selectedCell);
+                } else if (!pendingAction) {
+                    const res = getValidMoves(selectedCell);
+                    validMoves = res.moves;
+                    validAttacks = res.attacks;
+                }
+            }
+
+            ROWS.forEach(r => {
+                COLS.forEach(col => {
+                    const coord = `${col}${r}`;
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+
+                    if (ISLAND_CELLS.has(coord)) {
+                        cell.classList.add('cell-island');
+                    } else if (NEUTRAL_CELLS.has(coord)) {
+                        cell.classList.add('cell-neutral');
+                    } else if (YELLOW_PORT_COLS.has(col)) {
+                        cell.classList.add('cell-port-yellow');
+                    } else if (RED_PORT_COLS.has(col)) {
+                        cell.classList.add('cell-port-red');
+                    } else {
+                        cell.classList.add('cell-sea');
+                    }
+
+                    if (WALLS.has(`${coord}:R`)) cell.classList.add('wall-right');
+                    if (WALLS.has(`${coord}:L`)) cell.classList.add('wall-left');
+                    if (WALLS.has(`${coord}:T`)) cell.classList.add('wall-top');
+                    if (WALLS.has(`${coord}:B`)) cell.classList.add('wall-bottom');
+
+                    if (coord === selectedCell) cell.classList.add('highlight-selected');
+                    if (validMoves.has(coord)) cell.classList.add('highlight-move');
+                    if (validAttacks.has(coord)) cell.classList.add('highlight-attack');
+                    if (validMines.has(coord)) cell.classList.add('highlight-mine');
+                    if (pendingAction && (pendingAction.to === coord || pendingAction.from === coord)) {
+                        cell.classList.add('highlight-pending');
+                    }
+
+                    const unit = board[coord];
+                    if (unit) {
+                        const token = document.createElement('div');
+                        token.className = `unit-token ${unit.owner === 'yellow' ? 'token-yellow' : 'token-red'}`;
+                        if (unit.type === 'BN') token.classList.add('token-battery');
+                        if (unit.revealed && unit.owner === myColor && unit.type !== 'BN') {
+                            token.classList.add('token-revealed');
+                        }
+
+                        if (unit.owner === myColor || unit.revealed) {
+                            token.textContent = unit.type;
+                        } else {
+                            token.textContent = '?';
+                        }
+                        cell.appendChild(token);
+                    }
+
+                    cell.onclick = () => onCellClick(coord);
+                    grid.appendChild(cell);
+                });
+            });
+        }
+
+        function onCellClick(coord) {
+            if (phase === 'setup') {
+                if (myReady) return;
+                const col = coord[0];
+                const isMyPort = myColor === 'yellow' ? YELLOW_PORT_COLS.has(col) : RED_PORT_COLS.has(col);
+                if (!isMyPort) return;
+
+                const existing = board[coord];
+                if (existing) {
+                    if (existing.owner === myColor && existing.type !== 'BN') {
+                        dockCounts[existing.type]++;
+                        delete board[coord];
+                        renderDock();
+                        renderBoard();
+                    }
+                    return;
+                }
+
+                if (selectedDockType && dockCounts[selectedDockType] > 0) {
+                    board[coord] = {
+                        id: `${myColor}_${selectedDockType}_${Math.random().toString(36).slice(2, 7)}`,
+                        type: selectedDockType,
+                        owner: myColor,
+                        revealed: false,
+                        neutralTurns: 0
+                    };
+                    dockCounts[selectedDockType]--;
+                    if (dockCounts[selectedDockType] === 0) selectedDockType = null;
+                    renderDock();
+                    renderBoard();
+                }
+                return;
+            }
+
+            if (phase !== 'battle' || currentTurn !== myColor) return;
+
+            // Tryb stawiania miny
+            if (placingMineMode && selectedCell) {
+                const validMines = getValidMineCells(selectedCell);
+                if (validMines.has(coord)) {
+                    placeMine(coord);
+                } else {
+                    placingMineMode = false;
+                    renderBoard();
+                    updateUI();
+                }
+                return;
+            }
+
+            // Jeśli jest już oczekujący ruch, kliknięcie innego pola nic nie robi (trzeba Potwierdzić lub Anulować)
+            if (pendingAction) return;
+
+            const clickedUnit = board[coord];
+            if (selectedCell && selectedCell !== coord) {
+                const { moves, attacks } = getValidMoves(selectedCell);
+                if (moves.has(coord) || attacks.has(coord)) {
+                    executeMoveOrAttack(selectedCell, coord, attacks.has(coord));
+                    return;
+                }
+            }
+
+            if (clickedUnit && clickedUnit.owner === myColor && clickedUnit.type !== 'BN' && clickedUnit.type !== 'MN') {
+                selectedCell = (selectedCell === coord) ? null : coord;
+                renderBoard();
+                updateUI();
+            } else {
+                selectedCell = null;
+                renderBoard();
+                updateUI();
+            }
+        }
+
+        // ==========================================
+        // 6. WALKA, RUCH I MINY
+        // ==========================================
+        function resolveCombat(attType, defType) {
+            if (defType === 'MN') return attType === 'TR' ? 'attacker' : 'both';
+            if (defType === 'BN') return attType === 'OR' ? 'attacker' : 'defender';
+            if (attType === defType) return 'both';
+            if (attType === 'OD') return 'defender';
+            if (defType === 'OD') return 'attacker';
+
+            const beats = {
+                PN: new Set(['OR', 'KR', 'NI', 'ES', 'TR']),
+                OR: new Set(['KR', 'NI', 'ES', 'TR']),
+                KR: new Set(['NI', 'ES', 'TR']),
+                NI: new Set(['OP', 'ES', 'TR']),
+                OP: new Set(['PN', 'OR', 'KR', 'NI', 'TR']),
+                ES: new Set(['OP', 'TR']),
+                TR: new Set([])
+            };
+
+            if (beats[attType] && beats[attType].has(defType)) return 'attacker';
+            return 'defender';
+        }
+
+        function executeMoveOrAttack(from, to, isAttack) {
+            const snapshotBoard = JSON.parse(JSON.stringify(board));
+            const attacker = board[from];
+            const defender = board[to];
+            let eventMsg = '';
+
+            if (!isAttack) {
+                board[to] = attacker;
+                delete board[from];
+                eventMsg = `Ruch jednostki na pole ${to}.`;
+                pendingAction = { type: 'move', from, to, snapshotBoard, eventMsg };
+                selectedCell = to;
+            } else {
+                const outcome = resolveCombat(attacker.type, defender.type);
+                attacker.revealed = true;
+                defender.revealed = true;
+
+                if (defender.type === 'BN' && attacker.type === 'OR' && isBlockedByWall(from, to)) {
+                    // OR niszczy BN z dystansu przez linię brzegową
+                    delete board[to];
+                    eventMsg = `Okręt rakietowy (${from}) zniszczył Baterię nabrzeżną na ${to}!`;
+                } else if (outcome === 'attacker') {
+                    board[to] = attacker;
+                    delete board[from];
+                    eventMsg = `${UNIT_TYPES[attacker.type].name} pokonał ${UNIT_TYPES[defender.type].name} na ${to}!`;
+                } else if (outcome === 'defender') {
+                    delete board[from];
+                    eventMsg = `${UNIT_TYPES[attacker.type].name} uległ ${UNIT_TYPES[defender.type].name} na ${to}!`;
+                } else {
+                    delete board[from];
+                    delete board[to];
+                    eventMsg = `Starcie na ${to}: obie jednostki (${attacker.type} i ${defender.type}) zatonęły!`;
+                }
+                pendingAction = { type: 'attack', from, to, snapshotBoard, eventMsg };
+                selectedCell = null;
+            }
+
+            renderBoard();
+            updateUI();
+        }
+
+        function placeMine(targetCoord) {
+            if (minesPlacedCount[myColor] >= 6) {
+                showToast('Wykorzystano już wszystkie 6 min!');
+                placingMineMode = false;
+                return;
+            }
+            const snapshotBoard = pendingAction ? pendingAction.snapshotBoard : JSON.parse(JSON.stringify(board));
+            board[targetCoord] = {
+                id: `${myColor}_MN_${Date.now()}`,
+                type: 'MN',
+                owner: myColor,
+                revealed: false,
+                neutralTurns: 0
+            };
+            minesPlacedCount[myColor]++;
+            placingMineMode = false;
+
+            if (pendingAction && pendingAction.type === 'move') {
+                pendingAction.minePlacedAfterMove = true;
+                pendingAction.eventMsg += ` Postawiono minę na ${targetCoord}.`;
+            } else {
+                pendingAction = {
+                    type: 'mine',
+                    from: selectedCell,
+                    to: targetCoord,
+                    snapshotBoard,
+                    eventMsg: `Trałowiec postawił minę na ${targetCoord}.`
+                };
+            }
+            renderBoard();
+            updateUI();
+        }
+
+        document.getElementById('btn-place-mine').addEventListener('click', () => {
+            if (minesPlacedCount[myColor] >= 6) {
+                showToast('Brak min w zapasie (maks. 6)!');
+                return;
+            }
+            placingMineMode = !placingMineMode;
+            renderBoard();
+            updateUI();
+        });
+
+        // ==========================================
+        // 7. POTWIERDZANIE I ANULOWANIE TURY
+        // ==========================================
+        function updateAllNeutralTurnsForPlayer(playerColor) {
+            Object.keys(board).forEach(coord => {
+                const u = board[coord];
+                if (u && u.owner === playerColor && u.type !== 'BN' && u.type !== 'MN') {
+                    if (NEUTRAL_CELLS.has(coord)) {
+                        u.neutralTurns = (u.neutralTurns || 0) + 1;
+                        if (u.neutralTurns >= 4) {
+                            delete board[coord];
+                            lastEventText += ` Jednostka na ${coord} internowana (4 tury na wodach neutralnych)!`;
+                        }
+                    } else {
+                        u.neutralTurns = 0;
+                    }
+                }
+            });
+        }
+
+        function checkWinConditions() {
+            let yellowOD = false, redOD = false;
+            let yellowOR = 0, redOR = 0;
+
+            Object.keys(board).forEach(coord => {
+                const u = board[coord];
+                const col = coord[0];
+                if (u.type === 'OD') {
+                    if (u.owner === 'yellow') {
+                        yellowOD = true;
+                        if (RED_PORT_COLS.has(col)) endGame('yellow', 'Okręt desantowy Żółtych wpłynął do portu Czerwonych!');
+                    } else {
+                        redOD = true;
+                        if (YELLOW_PORT_COLS.has(col)) endGame('red', 'Okręt desantowy Czerwonych wpłynął do portu Żółtych!');
+                    }
+                }
+                if (u.type === 'OR') {
+                    if (u.owner === 'yellow') yellowOR++;
+                    else redOR++;
+                }
+            });
+
+            if (phase === 'battle') {
+                if (!yellowOD) endGame('red', 'Okręt desantowy Żółtych został zniszczony!');
+                else if (!redOD) endGame('yellow', 'Okręt desantowy Czerwonych został zniszczony!');
+                else if (yellowOR === 0) endGame('red', 'Żółci stracili wszystkie Okręty rakietowe!');
+                else if (redOR === 0) endGame('yellow', 'Czerwoni stracili wszystkie Okręty rakietowe!');
+            }
+        }
+
+        function endGame(winner, reason) {
+            phase = 'gameover';
+            document.getElementById('gameover-title').textContent = winner === myColor ? 'ZWYCIĘSTWO!' : 'PORAŻKA!';
+            document.getElementById('gameover-reason').textContent = reason;
+            openModal('modal-gameover');
+        }
+
+        document.getElementById('btn-confirm-turn').addEventListener('click', () => {
+            if (!pendingAction) return;
+            lastEventText = pendingAction.eventMsg;
+            updateAllNeutralTurnsForPlayer(myColor);
+            pendingAction = null;
+            selectedCell = null;
+            placingMineMode = false;
+
+            currentTurn = myColor === 'yellow' ? 'red' : 'yellow';
+            turnNumber++;
+
+            checkWinConditions();
+            sendData({
+                type: 'SYNC_BOARD',
+                board,
+                currentTurn,
+                lastEvent: lastEventText,
+                minesPlacedCount,
+                turnNumber
+            });
+            renderBoard();
+            updateUI();
+        });
+
+        document.getElementById('btn-cancel-turn').addEventListener('click', () => {
+            if (!pendingAction) return;
+            board = pendingAction.snapshotBoard;
+            if (pendingAction.type === 'mine' || pendingAction.minePlacedAfterMove) {
+                minesPlacedCount[myColor] = Math.max(0, minesPlacedCount[myColor] - 1);
+            }
+            pendingAction = null;
+            selectedCell = null;
+            placingMineMode = false;
+            renderBoard();
+            updateUI();
+        });
+
         // ==========================================
         // 8. ODBIÓR DANYCH Z SIECI (obsługiwany przez onSnapshot w sekcji 3)
         // ==========================================
