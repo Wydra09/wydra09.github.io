@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manewry Morskie - Gra Sieciowa (PeerJS)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            background-color: #090d16;
+            color: #f8fafc;
+        }
+
+        .font-title {
+            font-family: 'Cinzel', serif;
+        }
+
+        .board-container {
+            width: 100%;
+            max-width: 1150px;
+            aspect-ratio: 18 / 12;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(18, minmax(0, 1fr));
+            grid-template-rows: repeat(12, minmax(0, 1fr));
+            gap: 1px;
+            background-color: #0f172a;
+            border: 4px solid #334155;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+        }
+
+        .cell {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+
+        .cell-sea { background-color: #0284c7; }
+        .cell-sea:hover { background-color: #0369a1; }
+        
+        .cell-neutral { 
+            background-color: #0284c7; 
+            background-image: radial-gradient(#090d16 55%, transparent 55%);
+            background-size: 6px 6px;
+        }
+        .cell-neutral:hover { background-color: #38bdf8; }
+
+        .cell-island { 
+            background-color: #65a30d; 
+            background-image: radial-gradient(#3f6212 35%, transparent 35%);
+            border: 1px solid #3f6212;
+            cursor: not-allowed;
+        }
+
+        .cell-port-yellow { 
+            background-color: #eab308; 
+            border: 1px solid #ca8a04;
+        }
+        .cell-port-yellow:hover { background-color: #facc15; }
+        
+        .cell-port-red { 
+            background-color: #dc2626; 
+            border: 1px solid #991b1b;
+        }
+        .cell-port-red:hover { background-color: #ef4444; }
+
+        .cell-selectable {
+            box-shadow: inset 0 0 0 3px #facc15;
+            animation: pulse-border 1.5s infinite;
+        }
+
+        .cell-target {
+            box-shadow: inset 0 0 0 3px #ef4444;
+            animation: pulse-border-red 1.5s infinite;
+        }
+
+        .cell-selected {
+            box-shadow: inset 0 0 0 4px #3b82f6;
+            background-color: #38bdf8 !important;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: inset 0 0 0 2px #facc15; }
+            50% { box-shadow: inset 0 0 0 4px #fef08a; }
+        }
+
+        @keyframes pulse-border-red {
+            0%, 100% { box-shadow: inset 0 0 0 2px #ef4444; }
+            50% { box-shadow: inset 0 0 0 4px #fca5a5; }
+        }
+
+        .piece {
+            width: 90%;
+            height: 90%;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            z-index: 10;
+            padding: 1px;
+            text-align: center;
+        }
+
+        .piece-yellow {
+            background: linear-gradient(135deg, #fef08a 0%, #eab308 100%);
+            color: #713f12;
+            border: 1px solid #ca8a04;
+        }
+
+        .piece-red {
+            background: linear-gradient(135deg, #fca5a5 0%, #dc2626 100%);
+            color: #450a0a;
+            border: 1px solid #991b1b;
+        }
+
+        .piece-fog {
+            background: linear-gradient(135deg, #64748b 0%, #334155 100%) !important;
+            color: #cbd5e1 !important;
+            border: 1px solid #475569 !important;
+        }
+
+        .piece-label {
+            font-size: 0.6rem;
+            font-weight: 800;
+            line-height: 1.0;
+            white-space: normal;
+            word-break: break-word;
+            text-align: center;
+            max-width: 100%;
+        }
+
+        @media (max-width: 640px) {
+            .piece-label {
+                font-size: 0.45rem;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-950">
+
+    <!-- Nagłówek i Sieć -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between shrink-0 gap-2">
+        <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-ship text-xl text-amber-500"></i>
+            <h1 class="text-xl font-bold font-title tracking-wider text-amber-400">MANEWRY MORSKIE ONLINE</h1>
+        </div>
+        
+        <!-- Panel Połączenia PeerJS -->
+        <div id="net-panel" class="flex items-center space-x-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
+            <span id="net-status" class="text-slate-400">Tryb: Lokaly / Brak połączenia</span>
+            <button onclick="createRoom()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-2 py-1 rounded font-bold">Stwórz Pokój</button>
+            <div class="flex items-center space-x-1">
+                <input id="room-code-input" type="text" placeholder="Kod..." class="w-24 bg-slate-900 border border-slate-700 px-2 py-1 rounded text-white font-mono uppercase">
+                <button onclick="joinRoom()" class="bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 rounded font-bold">Dołącz</button>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <div id="turn-badge" class="flex items-center space-x-2 font-bold text-xs bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                <span id="turn-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                <span id="turn-text" class="text-yellow-400">Flota Żółta</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Główna część gry -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden p-2 md:p-4 gap-3">
+
+        <!-- Panel boczny / Sterowanie -->
+        <aside class="w-full md:w-72 flex flex-col gap-3 shrink-0">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-lg text-xs">
+                <h2 class="font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span>Stan Gry</span>
+                    <i class="fa-solid fa-signal text-amber-500"></i>
+                </h2>
+                <div id="action-prompt" class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-slate-300 min-h-[50px] leading-relaxed">
+                    Wybierz jednostkę z doku i postaw ją w porcie lub kliknij "Rozstaw Losowo".
+                </div>
+                
+                <div class="mt-3 flex gap-2">
+                    <button id="btn-random-setup" onclick="randomizeSetup()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-1.5 rounded transition">
+                        <i class="fa-solid fa-shuffle mr-1"></i> Rozstaw Losowo
+                    </button>
+                    <button id="btn-start-battle" onclick="startBattlePhase()" class="hidden flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-1.5 rounded transition">
+                        <i class="fa-solid fa-play mr-1"></i> Bitwa!
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dok Rozstawiania / Statystyki -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex-1 flex flex-col overflow-hidden shadow-lg">
+                <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Dok Jednostek</h2>
+                <div id="setup-dock" class="flex-1 overflow-y-auto space-y-1 pr-1 text-xs"></div>
+            </div>
+        </aside>
+
+        <!-- Plansza Gry -->
+        <section class="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-2 md:p-4 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
+            <div class="board-container flex items-center justify-center">
+                <div id="board" class="board-grid w-full h-full rounded-lg overflow-hidden"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const COLS = 18;
+        const ROWS = 12;
+        const TEAM_YELLOW = 'yellow';
+        const TEAM_RED = 'red';
+
+        const SHIP_TYPES = {
+            BATTLESHIP: { key: 'BATTLESHIP', name: 'Pancernik', speed: 2, count: 3 },
+            MISSILE_SHIP: { key: 'MISSILE_SHIP', name: 'Okręt Rakietowy', speed: 1, count: 3 },
+            CRUISER: { key: 'CRUISER', name: 'Krążownik', speed: 2, count: 3 },
+            DESTROYER: { key: 'DESTROYER', name: 'Niszczyciel', speed: 4, count: 4 },
+            SUBMARINE: { key: 'SUBMARINE', name: 'Okręt Podwodny', speed: 2, count: 4 },
+            ESCORT: { key: 'ESCORT', name: 'Eskortowiec', speed: 3, count: 4 },
+            MINESWEEPER: { key: 'MINESWEEPER', name: 'Trałowiec', speed: 2, count: 4 },
+            LANDING_CRAFT: { key: 'LANDING_CRAFT', name: 'Okręt Desantowy', speed: 1, count: 1 },
+            COASTAL_BATTERY: { key: 'COASTAL_BATTERY', name: 'Bateria Nabrzeżna', speed: 0, count: 4 },
+            MINE: { key: 'MINE', name: 'Mina', speed: 0, count: 6 }
+        };
+
+        const BATTERY_POSITIONS = [
+            { r: 1, c: 3, team: TEAM_YELLOW },
+            { r: 3, c: 3, team: TEAM_YELLOW },
+            { r: 8, c: 1, team: TEAM_YELLOW },
+            { r: 10, c: 2, team: TEAM_YELLOW },
+            { r: 1, c: 15, team: TEAM_RED },
+            { r: 3, c: 16, team: TEAM_RED },
+            { r: 8, c: 14, team: TEAM_RED },
+            { r: 10, c: 14, team: TEAM_RED }
+        ];
+
+        let peer = null;
+        let conn = null;
+        let myRole = null; // 'yellow' lub 'red'
+
+        let gameState = {
+            currentTurn: TEAM_YELLOW,
+            phase: 'SETUP',
+            selectedCell: null,
+            selectedDockPiece: null,
+            unplacedPool: [],
+            validMoves: [],
+            board: [],
+            winner: null
+        };
+
+        function initPeer() {
+            peer = new Peer();
+            peer.on('open', (id) => {
+                console.log('My peer ID: ', id);
+            });
+            peer.on('connection', (c) => {
+                conn = c;
+                setupNetEvents();
+                myRole = TEAM_YELLOW;
+                document.getElementById('net-status').innerText = 'Połączono! Jesteś ŻÓŁTY (Host)';
+            });
+        }
+
+        function createRoom() {
+            if (!peer) initPeer();
+            let code = Math.floor(1000 + Math.random() * 9000);
+            peer = new Peer('morskie-' + code);
+            peer.on('open', (id) => {
+                document.getElementById('net-status').innerText = `Pokój: KOD ${code} (Czekam...)`;
+                myRole = TEAM_YELLOW;
+            });
+            peer.on('connection', (c) => {
+                conn = c;
+                setupNetEvents();
+                document.getElementById('net-status').innerText = `Połączono z Rywalem! Jesteś ŻÓŁTY`;
+            });
+        }
+
+        function joinRoom() {
+            let code = document.getElementById('room-code-input').value.trim();
+            if (!code) return;
+            if (!peer) peer = new Peer();
+            
+            conn = peer.connect('morskie-' + code);
+            setupNetEvents();
+            myRole = TEAM_RED;
+            document.getElementById('net-status').innerText = `Łączenie z ${code}...`;
+        }
+
+        function setupNetEvents() {
+            conn.on('open', () => {
+                document.getElementById('net-status').innerText = `Połączono! Jesteś: ${myRole === TEAM_YELLOW ? 'ŻÓŁTY' : 'CZERWONY'}`;
+            });
+            conn.on('data', (data) => {
+                if (data.type === 'SYNC_BOARD') {
+                    gameState.board = data.board;
+                    gameState.currentTurn = data.currentTurn;
+                    gameState.phase = data.phase;
+                    renderBoard();
+                }
+            });
+        }
+
+        function syncNetwork() {
+            if (conn && conn.open) {
+                conn.send({
+                    type: 'SYNC_BOARD',
+                    board: gameState.board,
+                    currentTurn: gameState.currentTurn,
+                    phase: gameState.phase
+                });
+            }
+        }
+
+        function createInitialBoard() {
+            let board = [];
+            for (let r = 0; r < ROWS; r++) {
+                let row = [];
+                for (let c = 0; c < COLS; c++) {
+                    let cellType = 'sea';
+                    if (r <= 3 && c <= 3) cellType = 'port-yellow';
+                    else if (r === 4 && c <= 3) cellType = 'port-yellow';
+                    else if (r >= 5 && r <= 9 && c <= 1) cellType = 'port-yellow';
+                    else if (r >= 10 && c <= 2) cellType = 'port-yellow';
+
+                    if (r <= 1 && c >= 15) cellType = 'port-red';
+                    else if (r >= 2 && r <= 6 && c >= 16) cellType = 'port-red';
+                    else if (r >= 7 && c >= 14) cellType = 'port-red';
+
+                    if ((r === 5 || r === 6) && (c === 8 || c === 9)) cellType = 'island';
+                    else if ((r === 4 && (c >= 7 && c <= 9)) || (r === 5 && (c === 7 || c === 10 || c === 11)) || (r === 6 && (c === 6 || c === 7 || c === 10)) || (r === 7 && (c >= 8 && c <= 10))) cellType = 'neutral';
+
+                    row.push({ r, c, type: cellType, piece: null });
+                }
+                board.push(row);
+            }
+            return board;
+        }
+
+        function populateFleets(board) {
+            BATTERY_POSITIONS.forEach((pos, i) => {
+                board[pos.r][pos.c].piece = {
+                    id: `${pos.team}-battery-${i}`,
+                    type: 'COASTAL_BATTERY',
+                    team: pos.team,
+                    revealed: true
+                };
+            });
+        }
+
+        function generateUnplacedPool(team) {
+            let pool = [];
+            Object.keys(SHIP_TYPES).forEach(typeKey => {
+                if (typeKey !== 'COASTAL_BATTERY') {
+                    for (let i = 0; i < SHIP_TYPES[typeKey].count; i++) {
+                        pool.push({ id: `${team}-${typeKey}-${i}`, type: typeKey, team, revealed: false });
+                    }
+                }
+            });
+            return pool;
+        }
+
+        function initGame() {
+            let board = createInitialBoard();
+            populateFleets(board);
+            gameState = {
+                currentTurn: TEAM_YELLOW,
+                phase: 'SETUP',
+                selectedCell: null,
+                selectedDockPiece: null,
+                unplacedPool: generateUnplacedPool(TEAM_YELLOW),
+                validMoves: [],
+                board,
+                winner: null
+            };
+            renderBoard();
+            renderSetupDock();
+        }
+
+        function renderBoard() {
+            const boardElem = document.getElementById('board');
+            boardElem.innerHTML = '';
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let cellData = gameState.board[r][c];
+                    let cellDiv = document.createElement('div');
+                    let baseClass = 'cell cell-' + cellData.type;
+                    cellDiv.className = baseClass;
+
+                    let isYellowPort = cellData.type === 'port-yellow';
+                    let isRedPort = cellData.type === 'port-red';
+
+                    if (isYellowPort) {
+                        if ((r === 0 && c === 3) || (r === 1 && c === 3) || (r === 3 && c === 3) || (r === 4 && c === 3) || (r === 5 && c === 1) || (r === 6 && c === 1) || (r === 7 && c === 1) || (r === 8 && c === 1) || (r === 10 && c === 2) || (r === 11 && c === 2)) cellDiv.style.borderRight = '4px solid #ffffff';
+                        if ((r === 1 && c === 3) || (r === 4 && c === 3) || (r === 4 && c === 2) || (r === 8 && c === 1)) cellDiv.style.borderBottom = '4px solid #ffffff';
+                        if ((r === 3 && c === 3) || (r === 10 && c === 1) || (r === 10 && c === 2)) cellDiv.style.borderTop = '4px solid #ffffff';
+                    }
+
+                    if (isRedPort) {
+                        if ((r === 0 && c === 15) || (r === 1 && c === 15) || (r === 3 && c === 16) || (r === 4 && c === 16) || (r === 5 && c === 16) || (r === 6 && c === 16) || (r === 7 && c === 14) || (r === 8 && c === 14) || (r === 10 && c === 14) || (r === 11 && c === 14)) cellDiv.style.borderLeft = '4px solid #ffffff';
+                        if ((r === 1 && c === 15) || (r === 1 && c === 16) || (r === 8 && c === 14)) cellDiv.style.borderBottom = '4px solid #ffffff';
+                        if ((r === 3 && c === 16) || (r === 7 && c === 14) || (r === 7 && c === 15) || (r === 10 && c === 14)) cellDiv.style.borderTop = '4px solid #ffffff';
+                    }
+
+                    if (cellData.piece) {
+                        let piece = cellData.piece;
+                        let pieceDiv = document.createElement('div');
+                        let isEnemy = myRole && piece.team !== myRole;
+                        let showFog = gameState.phase === 'PLAY' && isEnemy && !piece.revealed && piece.type !== 'COASTAL_BATTERY';
+
+                        pieceDiv.className = `piece ${showFog ? 'piece-fog' : 'piece-' + piece.team}`;
+                        pieceDiv.innerHTML = `<span class="piece-label">${showFog ? 'Okręt' : SHIP_TYPES[piece.type].name}</span>`;
+                        cellDiv.appendChild(pieceDiv);
+                    }
+
+                    cellDiv.onclick = () => handleCellClick(r, c);
+                    boardElem.appendChild(cellDiv);
+                }
+            }
+        }
+
+        function handleCellClick(r, c) {
+            if (myRole && gameState.currentTurn !== myRole && gameState.phase === 'PLAY') return;
+            let cell = gameState.board[r][c];
+
+            if (gameState.phase === 'SETUP') {
+                let targetPort = gameState.currentTurn === TEAM_YELLOW ? 'port-yellow' : 'port-red';
+                if (cell.type === targetPort && !cell.piece && gameState.selectedDockPiece) {
+                    let idx = gameState.unplacedPool.findIndex(p => p.id === gameState.selectedDockPiece.id);
+                    if (idx !== -1) {
+                        cell.piece = gameState.unplacedPool.splice(idx, 1)[0];
+                        gameState.selectedDockPiece = gameState.unplacedPool[0] || null;
+                        renderSetupDock();
+                        renderBoard();
+                        syncNetwork();
+                    }
+                }
+            }
+        }
+
+        function renderSetupDock() {
+            const dock = document.getElementById('setup-dock');
+            dock.innerHTML = '';
+            let groupCounts = {};
+            gameState.unplacedPool.forEach(p => groupCounts[p.type] = (groupCounts[p.type] || 0) + 1);
+
+            Object.keys(groupCounts).forEach(typeKey => {
+                let div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800 cursor-pointer';
+                div.innerHTML = `<span>${SHIP_TYPES[typeKey].name}</span><span class="font-bold text-amber-400">${groupCounts[typeKey]}</span>`;
+                div.onclick = () => {
+                    gameState.selectedDockPiece = gameState.unplacedPool.find(p => p.type === typeKey);
+                };
+                dock.appendChild(div);
+            });
+        }
+
+        function randomizeSetup() {
+            initGame();
+            const setupTeam = (team) => {
+                let pool = generateUnplacedPool(team).sort(() => Math.random() - 0.5);
+                let portType = team === TEAM_YELLOW ? 'port-yellow' : 'port-red';
+                let idx = 0;
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        if (gameState.board[r][c].type === portType && !gameState.board[r][c].piece && idx < pool.length) {
+                            gameState.board[r][c].piece = pool[idx++];
+                        }
+                    }
+                }
+            };
+            setupTeam(TEAM_YELLOW);
+            setupTeam(TEAM_RED);
+            document.getElementById('btn-start-battle').classList.remove('hidden');
+            renderBoard();
+            syncNetwork();
+        }
+
+        function startBattlePhase() {
+            gameState.phase = 'PLAY';
+            renderBoard();
+            syncNetwork();
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
