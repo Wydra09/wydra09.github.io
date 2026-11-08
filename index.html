@@ -9,20 +9,23 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #f1f2f6;
             color: #2f3542;
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 20px;
+            max-width: 500px; /* Zwężenie pod widok mobilny */
+            margin: 20px auto;
+            padding: 15px;
         }
-        h1 { color: #1e272e; text-align: center; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #747d8c; margin-bottom: 40px; }
+        h1 { color: #1e272e; text-align: center; margin-bottom: 5px; font-size: 24px; }
+        .subtitle { text-align: center; color: #747d8c; margin-bottom: 25px; font-size: 14px; }
+        
+        /* Układ w jednej kolumnie */
         .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
+        
         .card {
             background: white;
-            padding: 25px;
+            padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             text-decoration: none;
@@ -32,21 +35,22 @@
             display: flex;
             flex-direction: column;
         }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-            border-left: 5px solid #ff4757;
+        .card:hover, .card:active {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
         }
-        /* Specjalny kolor paska przy najechaniu na konkretną kartę */
-        .card.garaz:hover { border-left-color: #2ed573; }
-        .card.bomber:hover { border-left-color: #ffa502; }
-        .card.stoper:hover { border-left-color: #3742fa; }
+        
+        /* Akcenty kolorystyczne dla poszczególnych kart */
+        .card.morskie { border-left: 5px solid #00a8ff; }
+        .card.bomber { border-left: 5px solid #ffa502; }
+        .card.stoper { border-left: 5px solid #3742fa; }
+        .card.garaz { border-left: 5px solid #2ed573; }
 
-        .card h2 { margin: 0 0 10px 0; font-size: 20px; }
-        .card p { margin: 0; font-size: 14px; color: #57606f; line-height: 1.5; }
+        .card h2 { margin: 0 0 8px 0; font-size: 18px; }
+        .card p { margin: 0; font-size: 13px; color: #57606f; line-height: 1.4; }
         .tag {
             align-self: flex-start;
-            margin-top: auto;
+            margin-top: 12px;
             padding: 4px 8px;
             background: #f1f2f6;
             border-radius: 4px;
@@ -65,25 +69,32 @@
 
     <div class="grid">
         
-        <!-- KARTA: SYMULATOR GARAŻU -->
-        <a href="symulator-garazu/" class="card garaz">
-            <h2>🚗 Symulator wjazdu do garażu</h2>
-            <p>Interaktywne narzędzie do sprawdzania geometrii podjazdu o długości 305 cm. Wykrywa kolizje podwozia w czasie rzeczywistym.</p>
-            <div class="tag" style="margin-top: 15px;">Narzędzie / Canvas</div>
+        <!-- 1. MANEWRY MORSKIE -->
+        <a href="morskie/" class="card morskie">
+            <h2>⚓ Manewry Morskie Online</h2>
+            <p>Kultowa polska gra planszowa w wersji sieciowej. Strategiczne starcia floty na morzu z systemem Mgły Wojny.</p>
+            <div class="tag">Gra / WebRTC / P2P</div>
         </a>
 
-        <!-- KARTA: BOMBERMAN -->
+        <!-- 2. BOMBERMAN -->
         <a href="Bomberman/" class="card bomber">
             <h2>💣 Klasyczny Bomberman</h2>
             <p>Zręcznościowa gra retro przeniesiona do przeglądarki. Podkładaj bomby, niszcz przeszkody i unikaj eksplozji!</p>
-            <div class="tag" style="margin-top: 15px;">Gra / JS</div>
+            <div class="tag">Gra / JS</div>
         </a>
 
-        <!-- KARTA: STOPER TRENINGOWY -->
+        <!-- 3. STOPER TRENINGOWY -->
         <a href="Stoper/" class="card stoper">
             <h2>⏱️ Stoper Treningowy</h2>
             <p>Aplikacja do odmierzania czasu i ilości powtórzeń ćwiczeń z wbudowanym lektorem głosowym. Zoptymalizowana pod smartfony.</p>
-            <div class="tag" style="margin-top: 15px;">Aplikacja / Trening</div>
+            <div class="tag">Aplikacja / Trening</div>
+        </a>
+
+        <!-- 4. SYMULATOR GARAŻU -->
+        <a href="symulator-garazu/" class="card garaz">
+            <h2>🚗 Symulator wjazdu do garażu</h2>
+            <p>Interaktywne narzędzie do sprawdzania geometrii podjazdu o długości 305 cm. Wykrywa kolizje podwozia w czasie rzeczywistym.</p>
+            <div class="tag">Narzędzie / Canvas</div>
         </a>
 
     </div>
