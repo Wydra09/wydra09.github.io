@@ -189,21 +189,24 @@
             
             <!-- Góra: Status połączenia i tury -->
             <div class="space-y-1.5">
-                <div class="flex items-center justify-between bg-slate-900/80 px-2 py-1 rounded-lg border border-slate-700">
-                    <span class="text-[10px] text-slate-400 font-semibold">Status:</span>
+                <button id="btn-sync-status" onclick="forceSync()" title="Kliknij, aby odświeżyć połączenie" class="w-full flex items-center justify-between bg-slate-900/80 hover:bg-slate-900 px-2 py-1 rounded-lg border border-slate-700 transition">
+                    <span class="text-[10px] text-slate-400 font-semibold">Status (🔄):</span>
                     <span id="conn-status" class="text-[10px] font-bold text-emerald-400">Połączono</span>
-                </div>
+                </button>
 
                 <div id="turn-indicator" class="w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs bg-slate-700 text-white border border-slate-600">
                     Faza ustawiania
                 </div>
 
-                <div class="grid grid-cols-2 gap-1">
-                    <button onclick="openModal('modal-rules')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[11px] font-bold text-sky-300 transition">
+                <div class="grid grid-cols-3 gap-1">
+                    <button onclick="openModal('modal-rules')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] font-bold text-sky-300 transition">
                         📖 Zasady
                     </button>
-                    <button onclick="openModal('modal-table')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[11px] font-bold text-amber-300 transition">
+                    <button onclick="openModal('modal-table')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] font-bold text-amber-300 transition">
                         📊 Tabela
+                    </button>
+                    <button onclick="openModal('modal-save')" class="py-1.5 px-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[10px] font-bold text-emerald-300 transition">
+                        💾 Zapis
                     </button>
                 </div>
             </div>
@@ -273,23 +276,23 @@
                         <tr class="border-b border-slate-600 text-slate-400">
                             <th class="py-2 px-1">Jednostka (Inicjał)</th>
                             <th class="py-2 px-1 text-center">Ruch</th>
-                            <th class="py-2 px-1">Siła / Zasady</th>
-                            <th class="py-2 px-1 text-center">Szt.</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-700 text-slate-200">
-                        <tr><td class="py-1.5 px-1 font-bold">Pancernik (PN)</td><td class="text-center">2</td><td>Ulega tylko Okrętowi podwodnemu</td><td class="text-center">3</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Okręt rakietowy (OR)</td><td class="text-center">1</td><td>Ulega Pancernikowi i Podwodnemu. Niszczy Baterie</td><td class="text-center">3</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Krążownik (KR)</td><td class="text-center">2</td><td>Ulega Pancernikowi, Rakietowemu i Podwodnemu</td><td class="text-center">3</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Niszczyciel (NI)</td><td class="text-center">4</td><td>Ulega PN, OR, KR oraz Podwodnemu (gdy ten atakuje)</td><td class="text-center">4</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Okręt podwodny (OP)</td><td class="text-center">2</td><td>Ulega Eskortowcowi oraz Niszczycielowi (gdy ten atakuje)</td><td class="text-center">4</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Eskortowiec (ES)</td><td class="text-center">3</td><td>Ulega wszystkim oprócz Podwodnego i Trałowca</td><td class="text-center">4</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Trałowiec (TR)</td><td class="text-center">2</td><td>Ulega wszystkim. Stawia i zdejmuje Miny</td><td class="text-center">4</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Okręt desantowy (OD)</td><td class="text-center">1</td><td>Ulega wszystkim. Nie atakuje. Cel gry</td><td class="text-center">1</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Bateria nabrzeżna (BN)</td><td class="text-center">-</td><td>Bije w zasięgu 1 pola wszystko oprócz Rakietowego</td><td class="text-center">4</td></tr>
-                        <tr><td class="py-1.5 px-1 font-bold">Mina (MN)</td><td class="text-center">-</td><td>Niszczy każdy okręt oprócz Trałowca</td><td class="text-center">6</td></tr>
-                    </tbody>
-                </table>
+    <!-- MODAL: ZAPIS / WCZYTYWANIE GRY -->
+    <div id="modal-save" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div class="bg-slate-800 border border-slate-600 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <h2 class="text-base font-extrabold text-emerald-400">Zapis i Wczytywanie Gry</h2>
+                <button onclick="closeModal('modal-save')" class="text-slate-400 hover:text-white text-xl font-bold px-2">&times;</button>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+                Możesz zapisać aktualny stan bitwy do pliku na telefonie i wczytać go później po ponownym połączeniu z drugim graczem.
+            </p>
+            <button onclick="exportGameState()" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition">
+                ⬇️ Pobierz zapis gry (.json)
+            </button>
+            <div class="border-t border-slate-700 pt-3">
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">Wczytaj zapis z pliku:</label>
+                <input id="input-load-save" type="file" accept=".json" onchange="importGameState(event)"
+                    class="w-full text-xs text-slate-300 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-500 cursor-pointer">
             </div>
         </div>
     </div>
@@ -524,16 +527,26 @@
                     return;
                 }
                 if (conn && conn.open) {
-                    sendData({ type: 'HEARTBEAT', turnNumber, phase });
+                    sendData({ type: 'HEARTBEAT', turnNumber, phase, currentTurn });
                 }
             }, 3000);
         }
+
+        function forceSync() {
+            showToast('Odświeżanie połączenia i tury...');
+            attemptReconnect();
+            if (conn && conn.open) {
+                sendData({ type: 'HEARTBEAT', turnNumber, phase, currentTurn });
+                sendData({ type: 'REQUEST_SYNC' });
+            }
+        }
+        window.forceSync = forceSync;
 
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && phase !== 'lobby') {
                 attemptReconnect();
                 if (conn && conn.open) {
-                    sendData({ type: 'HEARTBEAT', turnNumber, phase });
+                    sendData({ type: 'HEARTBEAT', turnNumber, phase, currentTurn });
                 }
             }
         });
@@ -1063,7 +1076,6 @@
                 board[act.to] = movedUnit;
                 delete board[act.from];
                 lastEventText = `${playerLabel} wykonał ruch.`;
-                updateNeutralTurns(act.to);
             } else if (act.type === 'attack') {
                 const att = board[act.from];
                 const def = board[act.to];
@@ -1088,6 +1100,9 @@
                 }
             }
 
+            // Zliczanie tur na wodach neutralnych dla wszystkich moich statków
+            updateAllNeutralTurnsForPlayer(myColor);
+
             pendingAction = null;
             selectedCell = null;
             currentTurn = currentTurn === 'yellow' ? 'red' : 'yellow';
@@ -1098,6 +1113,23 @@
             renderBoard();
             updateUI();
         });
+
+        function updateAllNeutralTurnsForPlayer(owner) {
+            Object.keys(board).forEach(coord => {
+                const u = board[coord];
+                if (!u || u.owner !== owner) return;
+                if (NEUTRAL_CELLS.has(coord)) {
+                    u.neutralTurns = (u.neutralTurns || 0) + 1;
+                    if (u.neutralTurns >= 4) {
+                        delete board[coord];
+                        lastEventText = `${UNIT_TYPES[u.type].name} został internowany na wodach neutralnych!`;
+                        showToast(lastEventText);
+                    }
+                } else {
+                    u.neutralTurns = 0;
+                }
+            });
+        }
 
         function updateNeutralTurns(coord) {
             const u = board[coord];
@@ -1170,7 +1202,7 @@
                 if (phase === 'battle') {
                     if (data.turnNumber < turnNumber) {
                         sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
-                    } else if (data.turnNumber > turnNumber) {
+                    } else if (data.turnNumber > turnNumber || data.currentTurn !== currentTurn) {
                         sendData({ type: 'REQUEST_SYNC' });
                     }
                 }
@@ -1182,65 +1214,122 @@
         }
 
         // ==========================================
-        // 9. AKTUALIZACJA PANELU INFORMACYJNEGO
+        // 8B. ZAPIS I WCZYTYWANIE STANU GRY (.JSON)
+        // ==========================================
+        function exportGameState() {
+            const state = {
+                board,
+                currentTurn,
+                turnNumber,
+                phase,
+                lastEventText,
+                minesPlacedCount,
+                savedAt: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `manewry-morskie-tura-${turnNumber}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Zapisano stan gry!');
+            closeModal('modal-save');
+        }
+        window.exportGameState = exportGameState;
+
+        function importGameState(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const state = JSON.parse(e.target.result);
+                    if (!state.board || !state.currentTurn) {
+                        showToast('Nieprawidłowy plik zapisu!');
+                        return;
+                    }
+                    board = state.board;
+                    currentTurn = state.currentTurn;
+                    turnNumber = (state.turnNumber || 0) + 1;
+                    phase = 'battle';
+                    lastEventText = state.lastEventText || 'Wczytano zapisany stan gry.';
+                    minesPlacedCount = state.minesPlacedCount || { yellow: 0, red: 0 };
+                    myReady = true;
+                    enemyReady = true;
+                    pendingAction = null;
+                    selectedCell = null;
+
+                    document.getElementById('dock-overlay').classList.add('hidden');
+                    sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
+                    renderBoard();
+                    updateUI();
+                    closeModal('modal-save');
+                    showToast('Wczytano i zsynchronizowano stan gry!');
+                } catch (err) {
+                    showToast('Błąd odczytu pliku zapisu!');
+                }
+            };
+            reader.readAsText(file);
+        }
+        window.importGameState = importGameState;
+
+        // ==========================================
+        // 9. AKTUALIZACJA INTERFEJSU
         // ==========================================
         function updateUI() {
-            const turnEl = document.getElementById('turn-indicator');
+            const turnInd = document.getElementById('turn-indicator');
             if (phase === 'setup') {
-                turnEl.textContent = myReady ? 'Czekam na wroga...' : 'Faza ustawiania';
-                turnEl.className = 'w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs bg-slate-700 text-white border border-slate-600';
+                turnInd.textContent = myReady ? 'Czekam na wroga...' : 'Faza ustawiania';
+                turnInd.className = 'w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs bg-slate-700 text-white border border-slate-600';
             } else if (phase === 'battle') {
                 const isMyTurn = currentTurn === myColor;
-                turnEl.textContent = isMyTurn ? 'TWOJA TURA' : 'TURA WROGA';
-                turnEl.className = `w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs border ${
-                    currentTurn === 'yellow'
-                        ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500'
-                        : 'bg-red-500/20 text-red-300 border-red-500'
+                turnInd.textContent = isMyTurn ? 'TWOJA TURA' : 'TURA WROGA';
+                turnInd.className = `w-full py-1.5 px-2 rounded-lg text-center font-extrabold text-xs border ${
+                    isMyTurn
+                        ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500'
+                        : 'bg-rose-600/30 text-rose-300 border-rose-500'
                 }`;
             }
 
-            // Panel wybranej jednostki
+            document.getElementById('last-event-box').textContent = lastEventText;
+
+            const badge = document.getElementById('selected-unit-badge');
             const nameEl = document.getElementById('selected-unit-name');
             const descEl = document.getElementById('selected-unit-desc');
-            const badgeEl = document.getElementById('selected-unit-badge');
+            const neutralEl = document.getElementById('neutral-warning');
             const mineBtn = document.getElementById('btn-place-mine');
-            const neutralWarn = document.getElementById('neutral-warning');
-            const eventBox = document.getElementById('last-event-box');
 
-            eventBox.textContent = lastEventText;
-
-            if (selectedCell && board[selectedCell]) {
+            if (selectedCell && board[selectedCell] && board[selectedCell].owner === myColor) {
                 const u = board[selectedCell];
                 const info = UNIT_TYPES[u.type];
-                badgeEl.classList.remove('hidden');
-                badgeEl.textContent = u.type;
-                badgeEl.className = `mb-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    u.owner === 'yellow' ? 'bg-yellow-500 text-slate-950' : 'bg-red-600 text-white'
+                badge.textContent = `${u.type} • ${selectedCell}`;
+                badge.className = `mb-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    myColor === 'yellow' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-red-500/20 text-red-300'
                 }`;
+                badge.classList.remove('hidden');
                 nameEl.textContent = info.name;
                 descEl.textContent = info.desc;
 
                 if (NEUTRAL_CELLS.has(selectedCell)) {
-                    neutralWarn.classList.remove('hidden');
-                    neutralWarn.textContent = `⚠️ Wody neutralne: tura ${u.neutralTurns || 0}/3`;
+                    neutralEl.textContent = `Wody neutralne: tura ${u.neutralTurns || 0}/3`;
+                    neutralEl.classList.remove('hidden');
                 } else {
-                    neutralWarn.classList.add('hidden');
+                    neutralEl.classList.add('hidden');
                 }
 
-                if (u.type === 'TR' && u.owner === myColor && currentTurn === myColor && !pendingAction) {
+                if (phase === 'battle' && currentTurn === myColor && u.type === 'TR' && !pendingAction) {
                     mineBtn.disabled = false;
-                    mineBtn.textContent = `💣 Mina (${6 - minesPlacedCount[myColor]})`;
+                    mineBtn.textContent = placingMineMode ? 'Anuluj minę' : `💣 Mina (${6 - minesPlacedCount[myColor]})`;
                 } else {
                     mineBtn.disabled = true;
                     mineBtn.textContent = '💣 Mina';
                 }
             } else {
-                badgeEl.classList.add('hidden');
-                neutralWarn.classList.add('hidden');
-                nameEl.textContent = pendingAction ? 'Ruch gotowy' : 'Wybierz jednostkę';
-                descEl.textContent = pendingAction
-                    ? 'Kliknij Potwierdź, aby zakończyć turę, lub Anuluj, aby cofnąć.'
-                    : 'Kliknij swój statek na planszy, aby zobaczyć jego ruch i siłę.';
+                badge.classList.add('hidden');
+                nameEl.textContent = 'Wybierz jednostkę';
+                descEl.textContent = 'Kliknij swój statek na planszy, aby zobaczyć jego ruch i siłę.';
+                neutralEl.classList.add('hidden');
                 mineBtn.disabled = true;
                 mineBtn.textContent = '💣 Mina';
             }
