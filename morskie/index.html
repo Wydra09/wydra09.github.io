@@ -394,6 +394,9 @@
         let pendingAction = null; // { type: 'move'|'attack', from, to, snapshotBoard }
         let lastEventText = 'Bitwa rozpoczęta!';
         let minesPlacedCount = { yellow: 0, red: 0 };
+        let turnNumber = 0;
+        let heartbeatTimer = null;
+        let roomCodeGlobal = null;
 
         // ==========================================
         // 3. INICJALIZACJA P2P (PEERJS)
@@ -408,6 +411,7 @@
                 return;
             }
             const code = Math.floor(1000 + Math.random() * 9000).toString();
+            roomCodeGlobal = code;
             const peerId = `manewry-morskie-${code}`;
             myColor = 'yellow';
 
@@ -435,6 +439,7 @@
                 showToast('Wpisz 4-cyfrowy kod pokoju!');
                 return;
             }
+            roomCodeGlobal = code;
             myColor = 'red';
             peer = new Peer();
             peer.on('open', () => {
@@ -448,17 +453,50 @@
 
         function setupConnection() {
             conn.on('open', () => {
-                document.getElementById('lobby-screen').classList.add('hidden');
-                document.getElementById('game-screen').classList.remove('hidden');
-                initGame();
+                document.getElementById('conn-status').textContent = 'Połączono';
+                document.getElementById('conn-status').classList.remove('text-rose-500');
+                document.getElementById('conn-status').classList.add('text-emerald-400');
+
+                if (phase === 'lobby') {
+                    document.getElementById('lobby-screen').classList.add('hidden');
+                    document.getElementById('game-screen').classList.remove('hidden');
+                    initGame();
+                } else {
+                    showToast('Połączenie przywrócone!');
+                    sendData({ type: 'HEARTBEAT', turnNumber, phase });
+                }
+                startHeartbeat();
             });
             conn.on('data', (data) => handleNetworkData(data));
             conn.on('close', () => {
                 document.getElementById('conn-status').textContent = 'Rozłączono';
                 document.getElementById('conn-status').classList.replace('text-emerald-400', 'text-rose-500');
-                showToast('Przeciwnik rozłączył się!');
+                showToast('Utracono połączenie! Próba wznowienia...');
             });
         }
+
+        function startHeartbeat() {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            heartbeatTimer = setInterval(() => {
+                if (conn && conn.open) {
+                    sendData({ type: 'HEARTBEAT', turnNumber, phase });
+                }
+            }, 3000);
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && phase !== 'lobby') {
+                if (peer && peer.disconnected) {
+                    peer.reconnect();
+                }
+                if (myColor === 'red' && (!conn || !conn.open) && peer && !peer.destroyed && roomCodeGlobal) {
+                    conn = peer.connect(`manewry-morskie-${roomCodeGlobal}`);
+                    setupConnection();
+                } else if (conn && conn.open) {
+                    sendData({ type: 'HEARTBEAT', turnNumber, phase });
+                }
+            }
+        });
 
         function sendData(payload) {
             if (conn && conn.open) conn.send(payload);
@@ -469,7 +507,7 @@
         // ==========================================
         function isYellowPort(c, r) {
             if (c <= 1) return true;
-            if (c === 2 && (r <= 4 || r >= 9)) return true;
+            if (c === 2 && (r <= 4 || r >= 10)) return true;
             if (c === 3 && r <= 4) return true;
             return false;
         }
@@ -711,9 +749,10 @@
                             };
                             minesPlacedCount[myColor]++;
                             placingMineMode = false;
+                            turnNumber++;
                             lastEventText = `${myColor === 'yellow' ? 'Żółty' : 'Czerwony'} postawił minę (nie liczy się za ruch).`;
                             showToast('Postawiono minę! Możesz teraz wykonać ruch.');
-                            sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount });
+                            sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
                             renderBoard();
                             updateUI();
                             return;
@@ -1012,8 +1051,9 @@
             pendingAction = null;
             selectedCell = null;
             currentTurn = currentTurn === 'yellow' ? 'red' : 'yellow';
+            turnNumber++;
 
-            sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount });
+            sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
             checkWinConditions();
             renderBoard();
             updateUI();
@@ -1075,13 +1115,21 @@
                 enemyReady = true;
                 checkBothReady();
             } else if (data.type === 'SYNC_BOARD') {
+                if (typeof data.turnNumber === 'number' && data.turnNumber < turnNumber) {
+                    return;
+                }
                 board = data.board;
                 currentTurn = data.currentTurn;
+                if (typeof data.turnNumber === 'number') turnNumber = data.turnNumber;
                 if (data.lastEvent) lastEventText = data.lastEvent;
                 if (data.minesPlacedCount) minesPlacedCount = data.minesPlacedCount;
                 checkWinConditions();
                 renderBoard();
                 updateUI();
+            } else if (data.type === 'HEARTBEAT') {
+                if (phase === 'battle' && data.turnNumber < turnNumber) {
+                    sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
+                }
             }
         }
 
