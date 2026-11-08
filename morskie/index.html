@@ -19,6 +19,7 @@
             height: 100%;
             overflow: hidden;
             font-family: 'Inter', sans-serif;
+        }
         /* Siatka 18x12 zachowująca idealne proporcje pól */
         #board-grid {
             display: grid;
@@ -310,6 +311,47 @@
                 Zagraj ponownie
             </button>
         </div>
+    </div>
+
+    <!-- POWIADOMIENIE TOAST -->
+    <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-white px-4 py-2 rounded-xl border border-slate-600 shadow-xl text-xs sm:text-sm font-bold pointer-events-none"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAxLxTRTy2KWyiLkhkO3CsYNL3H0PUrjaY",
+            authDomain: "morskie-c674c.firebaseapp.com",
+            projectId: "morskie-c674c",
+            storageBucket: "morskie-c674c.firebasestorage.app",
+            messagingSenderId: "554718232503",
+            appId: "1:554718232503:web:6491d509ab22d7e45d3232",
+            measurementId: "G-BTECDWWCRC"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // ==========================================
+        // 1. KONFIGURACJA PLANSZY I JEDNOSTEK
+        // ==========================================
+        const COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R'];
+        const ROWS = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+        const UNIT_TYPES = {
+            PN: { name: 'Pancernik', range: 2, count: 3, desc: 'Ruch: 2. Ulega tylko Okrętowi podwodnemu.' },
+            OR: { name: 'Okręt rakietowy', range: 1, count: 3, desc: 'Ruch: 1. Niszczy Baterie nabrzeżne. Ulega PN i OP.' },
+            KR: { name: 'Krążownik', range: 2, count: 3, desc: 'Ruch: 2. Ulega PN, OR i OP.' },
+            NI: { name: 'Niszczyciel', range: 4, count: 4, desc: 'Ruch: 4. Ulega PN, OR, KR oraz OP (w obronie).' },
+            OP: { name: 'Okręt podwodny', range: 2, count: 4, desc: 'Ruch: 2. Ulega ES oraz NI (w obronie).' },
+            ES: { name: 'Eskortowiec', range: 3, count: 4, desc: 'Ruch: 3. Ulega wszystkim oprócz OP i TR.' },
+            TR: { name: 'Trałowiec', range: 2, count: 4, desc: 'Ruch: 2. Stawia i usuwa Miny.' },
+            OD: { name: 'Okręt desantowy', range: 1, count: 1, desc: 'Ruch: 1. Cel gry: wpłynąć do portu wroga.' },
+            BN: { name: 'Bateria nabrzeżna', range: 0, count: 0, desc: 'Stała. Zniszczy ją tylko Okręt rakietowy.' },
+            MN: { name: 'Mina', range: 0, count: 0, desc: 'Niewidoczna. Bezpiecznie usuwa ją tylko Trałowiec.' }
+        };
+
         // Porty (dokładnie wg rys2)
         function isYellowPort(coord) {
             const col = coord[0];
@@ -364,25 +406,6 @@
             'I6:L', 'H6:R', 'I7:L', 'H7:R',
             'J6:R', 'K6:L', 'J7:R', 'K7:L',
             'I7:B', 'I8:T', 'J7:B', 'J8:T'
-        ]);
-
-        // Baterie nabrzeżne (stałe pozycje przy wejściach do portów)
-        const YELLOW_BATTERIES = ['D2', 'D4', 'B9', 'B11'];
-        const RED_BATTERIES = ['Q2', 'Q4', 'O9', 'O11'];
-
-        // Białe linie brzegowe (krawędzie blokujące ruch)
-        // Format: 'COORD:DIR' gdzie DIR to 'R' (right), 'L' (left), 'T' (top), 'B' (bottom)
-        const WALLS = new Set([
-            // Port żółty: ściana między D a E (oprócz D3), oraz między A-D12 a resztą, i B10 wejście
-            'D1:R', 'E1:L', 'D2:R', 'E2:L', 'D4:R', 'E4:L', 'D5:R', 'E5:L',
-            'D6:R', 'E6:L', 'D7:R', 'E7:L', 'D8:R', 'E8:L', 'D9:R', 'E9:L',
-            'B9:R', 'C9:L', 'B11:R', 'C11:L', 'B12:R', 'C12:L',
-            'C8:B', 'C9:T', 'D8:B', 'D9:T',
-            // Port czerwony: ściana między N a O (oprócz O10), oraz Q3 wejście
-            'Q1:L', 'P1:R', 'Q2:L', 'P2:R', 'Q4:L', 'P4:R',
-            'O4:B', 'O5:T', 'P4:B', 'P5:T',
-            'O5:L', 'N5:R', 'O6:L', 'N6:R', 'O7:L', 'N7:R', 'O8:L', 'N8:R', 'O9:L', 'N9:R',
-            'O11:L', 'N11:R', 'O12:L', 'N12:R'
         ]);
 
         // ==========================================
