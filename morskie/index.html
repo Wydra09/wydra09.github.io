@@ -1098,7 +1098,6 @@
         function executeMoveOrAttack(from, to, isAttack) {
             const snapshotBoard = JSON.parse(JSON.stringify(board));
             const attacker = board[from];
-            const defender = board[to];
             let eventMsg = '';
 
             if (!isAttack) {
@@ -1108,26 +1107,7 @@
                 pendingAction = { type: 'move', from, to, snapshotBoard, eventMsg };
                 selectedCell = to;
             } else {
-                const outcome = resolveCombat(attacker.type, defender.type);
-                attacker.revealed = true;
-                defender.revealed = true;
-
-                if (defender.type === 'BN' && attacker.type === 'OR' && isBlockedByWall(from, to)) {
-                    // OR niszczy BN z dystansu przez linię brzegową
-                    delete board[to];
-                    eventMsg = `Okręt rakietowy (${from}) zniszczył Baterię nabrzeżną na ${to}!`;
-                } else if (outcome === 'attacker') {
-                    board[to] = attacker;
-                    delete board[from];
-                    eventMsg = `${UNIT_TYPES[attacker.type].name} pokonał ${UNIT_TYPES[defender.type].name} na ${to}!`;
-                } else if (outcome === 'defender') {
-                    delete board[from];
-                    eventMsg = `${UNIT_TYPES[attacker.type].name} uległ ${UNIT_TYPES[defender.type].name} na ${to}!`;
-                } else {
-                    delete board[from];
-                    delete board[to];
-                    eventMsg = `Starcie na ${to}: obie jednostki (${attacker.type} i ${defender.type}) zatonęły!`;
-                }
+                eventMsg = `Atak na pole ${to}.`;
                 pendingAction = { type: 'attack', from, to, snapshotBoard, eventMsg };
                 selectedCell = null;
             }
@@ -1136,95 +1116,29 @@
             updateUI();
         }
 
-        function placeMine(targetCoord) {
-            if (minesPlacedCount[myColor] >= 6) {
-                showToast('Wykorzystano już wszystkie 6 min!');
-                placingMineMode = false;
-                return;
-            }
-            const snapshotBoard = pendingAction ? pendingAction.snapshotBoard : JSON.parse(JSON.stringify(board));
-            board[targetCoord] = {
-                id: `${myColor}_MN_${Date.now()}`,
-                type: 'MN',
-                owner: myColor,
-                revealed: false,
-                neutralTurns: 0
-            };
-            minesPlacedCount[myColor]++;
-            placingMineMode = false;
+        function performAttack(from, to) {
+            const attacker = board[from];
+            const defender = board[to];
+            if (!attacker || !defender) return 'Atak anulowany.';
 
-            if (pendingAction && pendingAction.type === 'move') {
-                pendingAction.minePlacedAfterMove = true;
-                pendingAction.eventMsg += ` Postawiono minę na ${targetCoord}.`;
+            const outcome = resolveCombat(attacker.type, defender.type);
+            attacker.revealed = true;
+            defender.revealed = true;
+
+            if (defender.type === 'BN' && attacker.type === 'OR' && isBlockedByWall(from, to)) {
+                delete board[to];
+                return `Okręt rakietowy (${from}) zniszczył Baterię nabrzeżną na ${to}!`;
+            } else if (outcome === 'attacker') {
+                board[to] = attacker;
+                delete board[from];
+                return `${UNIT_TYPES[attacker.type].name} pokonał ${UNIT_TYPES[defender.type].name} na ${to}!`;
+            } else if (outcome === 'defender') {
+                delete board[from];
+                return `${UNIT_TYPES[attacker.type].name} uległ ${UNIT_TYPES[defender.type].name} na ${to}!`;
             } else {
-                pendingAction = {
-                    type: 'mine',
-                    from: selectedCell,
-                    to: targetCoord,
-                    snapshotBoard,
-                    eventMsg: `Trałowiec postawił minę na ${targetCoord}.`
-                };
-            }
-            renderBoard();
-            updateUI();
-        }
-
-        document.getElementById('btn-place-mine').addEventListener('click', () => {
-            if (minesPlacedCount[myColor] >= 6) {
-                showToast('Brak min w zapasie (maks. 6)!');
-                return;
-            }
-            placingMineMode = !placingMineMode;
-            renderBoard();
-            updateUI();
-        });
-
-        // ==========================================
-        // 7. POTWIERDZANIE I ANULOWANIE TURY
-        // ==========================================
-        function updateAllNeutralTurnsForPlayer(playerColor) {
-            Object.keys(board).forEach(coord => {
-                const u = board[coord];
-                if (u && u.owner === playerColor && u.type !== 'BN' && u.type !== 'MN') {
-                    if (NEUTRAL_CELLS.has(coord)) {
-                        u.neutralTurns = (u.neutralTurns || 0) + 1;
-                        if (u.neutralTurns >= 4) {
-                            delete board[coord];
-                            lastEventText += ` Jednostka na ${coord} internowana (4 tury na wodach neutralnych)!`;
-                        }
-                    } else {
-                        u.neutralTurns = 0;
-                    }
-                }
-            });
-        }
-
-        function checkWinConditions() {
-            let yellowOD = false, redOD = false;
-            let yellowOR = 0, redOR = 0;
-
-            Object.keys(board).forEach(coord => {
-                const u = board[coord];
-                if (u.type === 'OD') {
-                    if (u.owner === 'yellow') {
-                        yellowOD = true;
-                        if (isRedPort(coord)) endGame('yellow', 'Okręt desantowy Żółtych wpłynął do portu Czerwonych!');
-                    } else {
-                        redOD = true;
-                        if (isYellowPort(coord)) endGame('red', 'Okręt desantowy Czerwonych wpłynął do portu Żółtych!');
-                    }
-                }
-                if (u.type === 'OR') {
-                    if (u.owner === 'yellow') yellowOR++;
-                    else redOR++;
-                }
-            });
-
-            if (phase === 'battle') {
-                if (!yellowOD) endGame('red', 'Okręt desantowy Żółtych został zniszczony!');
-                else if (!redOD) endGame('yellow', 'Okręt desantowy Czerwonych został zniszczony!');
-                else if (yellowOR === 0) endGame('red', 'Żółci stracili wszystkie Okręty rakietowe!');
-                else if (redOR === 0) endGame('yellow', 'Czerwoni stracili wszystkie Okręty rakietowe!');
+                delete board[from];
+                delete board[to];
+                return `Starcie na ${to}: obie jednostki (${attacker.type} i ${defender.type}) zatonęły!`;
             }
         }
 
@@ -1237,7 +1151,11 @@
 
         document.getElementById('btn-confirm-turn').addEventListener('click', () => {
             if (!pendingAction) return;
-            lastEventText = pendingAction.eventMsg;
+            if (pendingAction.type === 'attack') {
+                lastEventText = performAttack(pendingAction.from, pendingAction.to);
+            } else {
+                lastEventText = pendingAction.eventMsg;
+            }
             updateAllNeutralTurnsForPlayer(myColor);
             pendingAction = null;
             selectedCell = null;
@@ -1400,7 +1318,7 @@
             }
 
             document.getElementById('btn-confirm-turn').disabled = !pendingAction;
-            document.getElementById('btn-cancel-turn').disabled = !pendingAction || pendingAction.type === 'attack';
+            document.getElementById('btn-cancel-turn').disabled = !pendingAction;
         }
 
         // ==========================================
