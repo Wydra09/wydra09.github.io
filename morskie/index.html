@@ -310,60 +310,60 @@
                 Zagraj ponownie
             </button>
         </div>
-    </div>
+        // Porty (dokładnie wg rys2)
+        function isYellowPort(coord) {
+            const col = coord[0];
+            const r = parseInt(coord.slice(1), 10);
+            if (r >= 1 && r <= 5) return ['A', 'B', 'C', 'D'].includes(col);
+            if (r >= 6 && r <= 10) return ['A', 'B'].includes(col);
+            return ['A', 'B', 'C'].includes(col);
+        }
 
-    <!-- TOAST POWIADOMIEŃ -->
-    <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-slate-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-2xl text-center max-w-[90vw]"></div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyAxLxTRTy2KWyiLkhkO3CsYNL3H0PUrjaY",
-            authDomain: "morskie-c674c.firebaseapp.com",
-            projectId: "morskie-c674c",
-            storageBucket: "morskie-c674c.firebasestorage.app",
-            messagingSenderId: "554718232503",
-            appId: "1:554718232503:web:6491d509ab22d7e45d3232",
-            measurementId: "G-BTECDWWCRC"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // ==========================================
-        // 1. STAŁE I DEFINICJE JEDNOSTEK
-        // ==========================================
-        const COLS = 'ABCDEFGHIJKLMNOPQR'.split('');
-        const ROWS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-        const UNIT_TYPES = {
-            PN: { name: 'Pancernik', range: 2, count: 3, desc: 'Zasięg 2. Ulega tylko Okrętowi podwodnemu (OP).' },
-            OR: { name: 'Okręt rakietowy', range: 1, count: 3, desc: 'Zasięg 1. Ulega PN i OP. Jedyny niszczy Baterie nabrzeżne (BN).' },
-            KR: { name: 'Krążownik', range: 2, count: 3, desc: 'Zasięg 2. Ulega PN, OR i OP.' },
-            NI: { name: 'Niszczyciel', range: 4, count: 4, desc: 'Zasięg 4. Ulega PN, OR, KR oraz OP (gdy OP atakuje pierwszy).' },
-            OP: { name: 'Okręt podwodny', range: 2, count: 4, desc: 'Zasięg 2. Ulega ES oraz NI (gdy NI atakuje pierwszy).' },
-            ES: { name: 'Eskortowiec', range: 3, count: 4, desc: 'Zasięg 3. Ulega wszystkim oprócz OP i TR.' },
-            TR: { name: 'Trałowiec', range: 2, count: 4, desc: 'Zasięg 2. Ulega wszystkim. Stawia i usuwa Miny.' },
-            OD: { name: 'Okręt desantowy', range: 1, count: 1, desc: 'Zasięg 1. Ulega wszystkim. Nie atakuje. Musi wpłynąć do portu wroga!' },
-            BN: { name: 'Bateria nabrzeżna', range: 0, count: 0, desc: 'Stała. Blokuje i bije wroga w zasięgu 1 pola (oprócz OR).' },
-            MN: { name: 'Mina', range: 0, count: 0, desc: 'Stała. Zaatakowana niszczy każdy okręt oprócz Trałowca (TR).' }
-        };
-
-        // Porty (Żółty: A-D, 1-12; Czerwony: O-R, 1-12)
-        const YELLOW_PORT_COLS = new Set(['A', 'B', 'C', 'D']);
-        const RED_PORT_COLS = new Set(['O', 'P', 'Q', 'R']);
+        function isRedPort(coord) {
+            const col = coord[0];
+            const r = parseInt(coord.slice(1), 10);
+            if (r >= 1 && r <= 2) return ['P', 'Q', 'R'].includes(col);
+            if (r >= 3 && r <= 7) return ['Q', 'R'].includes(col);
+            return ['O', 'P', 'Q', 'R'].includes(col);
+        }
 
         // Wyspa na środku: I6, J6, I7, J7
         const ISLAND_CELLS = new Set(['I6', 'J6', 'I7', 'J7']);
 
-        // Wody neutralne wokół wyspy (H5-K8 bez wyspy)
+        // Wody neutralne wokół wyspy (wg rys2)
         const NEUTRAL_CELLS = new Set([
-            'H5', 'I5', 'J5', 'K5',
-            'H6', 'K6',
-            'H7', 'K7',
-            'H8', 'I8', 'J8', 'K8'
+            'H5', 'I5', 'J5',
+            'H6', 'K6', 'L6',
+            'G7', 'H7', 'K7',
+            'I8', 'J8', 'K8'
+        ]);
+
+        // Baterie nabrzeżne (stałe pozycje przy wejściach do portów wg rys2)
+        const YELLOW_BATTERIES = ['D2', 'D4', 'B9', 'C11'];
+        const RED_BATTERIES = ['P2', 'Q4', 'O9', 'O11'];
+
+        // Białe linie brzegowe (krawędzie blokujące ruch wg rys2)
+        const WALLS = new Set([
+            // Port żółty
+            'D1:R', 'E1:L', 'D2:R', 'E2:L', 'D2:B', 'D3:T',
+            'D4:T', 'D3:B', 'D4:R', 'E4:L',
+            'D5:R', 'E5:L', 'D5:B', 'D6:T', 'C5:B', 'C6:T',
+            'B6:R', 'C6:L', 'B7:R', 'C7:L', 'B8:R', 'C8:L', 'B9:R', 'C9:L',
+            'B9:B', 'B10:T',
+            'B11:T', 'B10:B', 'C11:T', 'C10:B',
+            'C11:R', 'D11:L', 'C12:R', 'D12:L',
+            // Port czerwony
+            'P1:L', 'O1:R', 'P2:L', 'O2:R', 'P2:B', 'P3:T', 'Q2:B', 'Q3:T',
+            'Q4:T', 'Q3:B', 'Q4:L', 'P4:R',
+            'Q5:L', 'P5:R', 'Q6:L', 'P6:R', 'Q7:L', 'P7:R',
+            'Q7:B', 'Q8:T', 'P7:B', 'P8:T', 'O7:B', 'O8:T',
+            'O8:L', 'N8:R', 'O9:L', 'N9:R', 'O9:B', 'O10:T',
+            'O11:T', 'O10:B', 'O11:L', 'N11:R', 'O12:L', 'N12:R',
+            // Wyspa
+            'I6:T', 'I5:B', 'J6:T', 'J5:B',
+            'I6:L', 'H6:R', 'I7:L', 'H7:R',
+            'J6:R', 'K6:L', 'J7:R', 'K7:L',
+            'I7:B', 'I8:T', 'J7:B', 'J8:T'
         ]);
 
         // Baterie nabrzeżne (stałe pozycje przy wejściach do portów)
@@ -679,12 +679,12 @@
             });
 
             // Zbierz wolne pola w swoim porcie
-            const portCols = myColor === 'yellow' ? YELLOW_PORT_COLS : RED_PORT_COLS;
             const freeCells = [];
             ROWS.forEach(r => {
                 COLS.forEach(col => {
                     const coord = `${col}${r}`;
-                    if (portCols.has(col) && !board[coord]) {
+                    const inPort = myColor === 'yellow' ? isYellowPort(coord) : isRedPort(coord);
+                    if (inPort && !board[coord]) {
                         freeCells.push(coord);
                     }
                 });
@@ -899,9 +899,9 @@
                         cell.classList.add('cell-island');
                     } else if (NEUTRAL_CELLS.has(coord)) {
                         cell.classList.add('cell-neutral');
-                    } else if (YELLOW_PORT_COLS.has(col)) {
+                    } else if (isYellowPort(coord)) {
                         cell.classList.add('cell-port-yellow');
-                    } else if (RED_PORT_COLS.has(col)) {
+                    } else if (isRedPort(coord)) {
                         cell.classList.add('cell-port-red');
                     } else {
                         cell.classList.add('cell-sea');
@@ -946,8 +946,7 @@
         function onCellClick(coord) {
             if (phase === 'setup') {
                 if (myReady) return;
-                const col = coord[0];
-                const isMyPort = myColor === 'yellow' ? YELLOW_PORT_COLS.has(col) : RED_PORT_COLS.has(col);
+                const isMyPort = myColor === 'yellow' ? isYellowPort(coord) : isRedPort(coord);
                 if (!isMyPort) return;
 
                 const existing = board[coord];
@@ -1149,14 +1148,13 @@
 
             Object.keys(board).forEach(coord => {
                 const u = board[coord];
-                const col = coord[0];
                 if (u.type === 'OD') {
                     if (u.owner === 'yellow') {
                         yellowOD = true;
-                        if (RED_PORT_COLS.has(col)) endGame('yellow', 'Okręt desantowy Żółtych wpłynął do portu Czerwonych!');
+                        if (isRedPort(coord)) endGame('yellow', 'Okręt desantowy Żółtych wpłynął do portu Czerwonych!');
                     } else {
                         redOD = true;
-                        if (YELLOW_PORT_COLS.has(col)) endGame('red', 'Okręt desantowy Czerwonych wpłynął do portu Żółtych!');
+                        if (isYellowPort(coord)) endGame('red', 'Okręt desantowy Czerwonych wpłynął do portu Żółtych!');
                     }
                 }
                 if (u.type === 'OR') {
