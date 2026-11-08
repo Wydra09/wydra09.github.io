@@ -19,16 +19,16 @@
             height: 100%;
             overflow: hidden;
             font-family: 'Inter', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-        }
-        /* Siatka 18x12 rozciągnięta na dostępną przestrzeń */
+        /* Siatka 18x12 zachowująca idealne proporcje pól */
         #board-grid {
             display: grid;
             grid-template-columns: repeat(18, minmax(0, 1fr));
             grid-template-rows: repeat(12, minmax(0, 1fr));
+            aspect-ratio: 18 / 12;
             width: 100%;
-            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            margin: auto;
             border: 2px solid #1e293b;
             background-color: #0284c7;
         }
@@ -379,10 +379,10 @@
             'B9:R', 'C9:L', 'B11:R', 'C11:L', 'B12:R', 'C12:L',
             'C8:B', 'C9:T', 'D8:B', 'D9:T',
             // Port czerwony: ściana między N a O (oprócz O10), oraz Q3 wejście
-            'O1:L', 'N1:R', 'O2:L', 'N2:R', 'O4:L', 'N4:R', 'O5:L', 'N5:R',
-            'O6:L', 'N6:R', 'O7:L', 'N7:R', 'O8:L', 'N8:R', 'O9:L', 'N9:R',
-            'Q9:L', 'P9:R', 'Q11:L', 'P11:R', 'Q12:L', 'P12:R',
-            'O8:B', 'O9:T', 'P8:B', 'P9:T'
+            'Q1:L', 'P1:R', 'Q2:L', 'P2:R', 'Q4:L', 'P4:R',
+            'O4:B', 'O5:T', 'P4:B', 'P5:T',
+            'O5:L', 'N5:R', 'O6:L', 'N6:R', 'O7:L', 'N7:R', 'O8:L', 'N8:R', 'O9:L', 'N9:R',
+            'O11:L', 'N11:R', 'O12:L', 'N12:R'
         ]);
 
         // ==========================================
