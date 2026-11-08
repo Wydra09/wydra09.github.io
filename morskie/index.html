@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manewry Morskie - Gra Sieciowa (PeerJS)</title>
+    <title>Manewry Morskie - Online Multiplayer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -75,31 +75,6 @@
         }
         .cell-port-red:hover { background-color: #ef4444; }
 
-        .cell-selectable {
-            box-shadow: inset 0 0 0 3px #facc15;
-            animation: pulse-border 1.5s infinite;
-        }
-
-        .cell-target {
-            box-shadow: inset 0 0 0 3px #ef4444;
-            animation: pulse-border-red 1.5s infinite;
-        }
-
-        .cell-selected {
-            box-shadow: inset 0 0 0 4px #3b82f6;
-            background-color: #38bdf8 !important;
-        }
-
-        @keyframes pulse-border {
-            0%, 100% { box-shadow: inset 0 0 0 2px #facc15; }
-            50% { box-shadow: inset 0 0 0 4px #fef08a; }
-        }
-
-        @keyframes pulse-border-red {
-            0%, 100% { box-shadow: inset 0 0 0 2px #ef4444; }
-            50% { box-shadow: inset 0 0 0 4px #fca5a5; }
-        }
-
         .piece {
             width: 90%;
             height: 90%;
@@ -136,7 +111,7 @@
         }
 
         .piece-label {
-            font-size: 0.6rem;
+            font-size: 0.55rem;
             font-weight: 800;
             line-height: 1.0;
             white-space: normal;
@@ -147,14 +122,14 @@
 
         @media (max-width: 640px) {
             .piece-label {
-                font-size: 0.45rem;
+                font-size: 0.4rem;
             }
         }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden bg-slate-950">
 
-    <!-- Nagłówek i Sieć -->
+    <!-- Nagłówek i Połączenie -->
     <header class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between shrink-0 gap-2">
         <div class="flex items-center space-x-2">
             <i class="fa-solid fa-ship text-xl text-amber-500"></i>
@@ -163,11 +138,11 @@
         
         <!-- Panel Połączenia PeerJS -->
         <div id="net-panel" class="flex items-center space-x-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
-            <span id="net-status" class="text-slate-400">Tryb: Lokaly / Brak połączenia</span>
-            <button onclick="createRoom()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-2 py-1 rounded font-bold">Stwórz Pokój</button>
+            <span id="net-status" class="text-amber-400 font-semibold">Nie połączono</span>
+            <button id="btn-create-room" onclick="createRoom()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-2.5 py-1 rounded font-bold transition">Stwórz Pokój</button>
             <div class="flex items-center space-x-1">
-                <input id="room-code-input" type="text" placeholder="Kod..." class="w-24 bg-slate-900 border border-slate-700 px-2 py-1 rounded text-white font-mono uppercase">
-                <button onclick="joinRoom()" class="bg-sky-500 hover:bg-sky-600 text-white px-2 py-1 rounded font-bold">Dołącz</button>
+                <input id="room-code-input" type="text" placeholder="KOD..." class="w-20 bg-slate-900 border border-slate-700 px-2 py-1 rounded text-white font-mono uppercase text-center">
+                <button id="btn-join-room" onclick="joinRoom()" class="bg-sky-500 hover:bg-sky-600 text-white px-2.5 py-1 rounded font-bold transition">Dołącz</button>
             </div>
         </div>
 
@@ -186,11 +161,11 @@
         <aside class="w-full md:w-72 flex flex-col gap-3 shrink-0">
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-lg text-xs">
                 <h2 class="font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                    <span>Stan Gry</span>
-                    <i class="fa-solid fa-signal text-amber-500"></i>
+                    <span>Stan Rozgrywki</span>
+                    <i class="fa-solid fa-wifi text-emerald-500"></i>
                 </h2>
                 <div id="action-prompt" class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-slate-300 min-h-[50px] leading-relaxed">
-                    Wybierz jednostkę z doku i postaw ją w porcie lub kliknij "Rozstaw Losowo".
+                    Stwórz pokój na pierwszym telefonie lub podaj kod rywalowi, aby połączyć oba urządzenia.
                 </div>
                 
                 <div class="mt-3 flex gap-2">
@@ -251,7 +226,16 @@
 
         let peer = null;
         let conn = null;
-        let myRole = null; // 'yellow' lub 'red'
+        let myRole = TEAM_YELLOW; // Domyślnie Host = Żółty, Dołączający = Czerwony
+
+        const PEER_CONFIG = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
+        };
 
         let gameState = {
             currentTurn: TEAM_YELLOW,
@@ -264,56 +248,79 @@
             winner: null
         };
 
-        function initPeer() {
-            peer = new Peer();
-            peer.on('open', (id) => {
-                console.log('My peer ID: ', id);
-            });
-            peer.on('connection', (c) => {
-                conn = c;
-                setupNetEvents();
-                myRole = TEAM_YELLOW;
-                document.getElementById('net-status').innerText = 'Połączono! Jesteś ŻÓŁTY (Host)';
-            });
-        }
-
         function createRoom() {
-            if (!peer) initPeer();
-            let code = Math.floor(1000 + Math.random() * 9000);
-            peer = new Peer('morskie-' + code);
+            let code = Math.floor(1000 + Math.random() * 9000).toString();
+            let peerId = 'morskie-room-' + code;
+
+            if (peer) peer.destroy();
+            peer = new Peer(peerId, PEER_CONFIG);
+
+            document.getElementById('net-status').innerText = 'Tworzenie pokoju...';
+
             peer.on('open', (id) => {
-                document.getElementById('net-status').innerText = `Pokój: KOD ${code} (Czekam...)`;
                 myRole = TEAM_YELLOW;
+                document.getElementById('net-status').innerText = `KOD: ${code} (Czekam...)`;
+                document.getElementById('action-prompt').innerText = `Podaj drugiemu graczowi KOD: ${code}. Oczekiwanie na połączenie...`;
             });
+
             peer.on('connection', (c) => {
                 conn = c;
                 setupNetEvents();
-                document.getElementById('net-status').innerText = `Połączono z Rywalem! Jesteś ŻÓŁTY`;
+                document.getElementById('net-status').innerText = `Połączono! Jesteś ŻÓŁTY (Host)`;
+                document.getElementById('action-prompt').innerText = `Gracz Czerwony dołączył! Możecie rozstawić jednostki.`;
+                syncNetwork();
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                document.getElementById('net-status').innerText = 'Błąd serwera. Spróbuj ponowie.';
             });
         }
 
         function joinRoom() {
             let code = document.getElementById('room-code-input').value.trim();
-            if (!code) return;
-            if (!peer) peer = new Peer();
-            
-            conn = peer.connect('morskie-' + code);
-            setupNetEvents();
-            myRole = TEAM_RED;
+            if (!code) {
+                alert('Wpisz 4-cyfrowy kod pokoju!');
+                return;
+            }
+
+            if (peer) peer.destroy();
+            peer = new Peer(PEER_CONFIG);
+
             document.getElementById('net-status').innerText = `Łączenie z ${code}...`;
+
+            peer.on('open', (id) => {
+                let targetId = 'morskie-room-' + code;
+                conn = peer.connect(targetId, { reliable: true });
+                myRole = TEAM_RED;
+                setupNetEvents();
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                document.getElementById('net-status').innerText = 'Nie znaleziono pokoju!';
+            });
         }
 
         function setupNetEvents() {
             conn.on('open', () => {
                 document.getElementById('net-status').innerText = `Połączono! Jesteś: ${myRole === TEAM_YELLOW ? 'ŻÓŁTY' : 'CZERWONY'}`;
+                document.getElementById('action-prompt').innerText = `Połączono z rywalem! Twoja rola: ${myRole === TEAM_YELLOW ? 'ŻÓŁTY' : 'CZERWONY'}.`;
+                syncNetwork();
             });
+
             conn.on('data', (data) => {
                 if (data.type === 'SYNC_BOARD') {
                     gameState.board = data.board;
                     gameState.currentTurn = data.currentTurn;
                     gameState.phase = data.phase;
                     renderBoard();
+                    updateTurnUI();
                 }
+            });
+
+            conn.on('close', () => {
+                document.getElementById('net-status').innerText = 'Połączenie przerwane';
             });
         }
 
@@ -391,6 +398,7 @@
             };
             renderBoard();
             renderSetupDock();
+            updateTurnUI();
         }
 
         function renderBoard() {
@@ -470,6 +478,13 @@
                 };
                 dock.appendChild(div);
             });
+        }
+
+        function updateTurnUI() {
+            let isYellow = gameState.currentTurn === TEAM_YELLOW;
+            document.getElementById('turn-dot').className = `w-2.5 h-2.5 rounded-full animate-pulse ${isYellow ? 'bg-yellow-400' : 'bg-red-500'}`;
+            document.getElementById('turn-text').innerText = isYellow ? 'Flota Żółta' : 'Flota Czerwona';
+            document.getElementById('turn-text').className = isYellow ? 'text-yellow-400' : 'text-red-500';
         }
 
         function randomizeSetup() {
