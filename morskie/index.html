@@ -397,6 +397,7 @@
         let turnNumber = 0;
         let heartbeatTimer = null;
         let roomCodeGlobal = null;
+        let lastHeartbeatReceived = Date.now();
 
         // ==========================================
         // 3. INICJALIZACJA P2P (PEERJS)
@@ -453,9 +454,8 @@
 
         function setupConnection() {
             conn.on('open', () => {
-                document.getElementById('conn-status').textContent = 'Połączono';
-                document.getElementById('conn-status').classList.remove('text-rose-500');
-                document.getElementById('conn-status').classList.add('text-emerald-400');
+                lastHeartbeatReceived = Date.now();
+                updateConnStatus(true);
 
                 if (phase === 'lobby') {
                     document.getElementById('lobby-screen').classList.add('hidden');
@@ -467,17 +467,62 @@
                 }
                 startHeartbeat();
             });
-            conn.on('data', (data) => handleNetworkData(data));
+            conn.on('data', (data) => {
+                lastHeartbeatReceived = Date.now();
+                updateConnStatus(true);
+                handleNetworkData(data);
+            });
             conn.on('close', () => {
-                document.getElementById('conn-status').textContent = 'Rozłączono';
-                document.getElementById('conn-status').classList.replace('text-emerald-400', 'text-rose-500');
+                updateConnStatus(false);
                 showToast('Utracono połączenie! Próba wznowienia...');
             });
+        }
+
+        function updateConnStatus(isOnline) {
+            const el = document.getElementById('conn-status');
+            if (isOnline) {
+                el.textContent = 'Połączono';
+                el.classList.remove('text-rose-500');
+                el.classList.add('text-emerald-400');
+            } else {
+                el.textContent = 'Rozłączono';
+                el.classList.remove('text-emerald-400');
+                el.classList.add('text-rose-500');
+            }
+        }
+
+        function isConnectionHealthy() {
+            if (!conn || !conn.open) return false;
+            if (conn.peerConnection) {
+                const state = conn.peerConnection.iceConnectionState;
+                if (state === 'disconnected' || state === 'failed' || state === 'closed') return false;
+            }
+            return (Date.now() - lastHeartbeatReceived) < 8000;
+        }
+
+        function attemptReconnect() {
+            if (peer && peer.disconnected && !peer.destroyed) {
+                peer.reconnect();
+            }
+            if (myColor === 'red' && peer && !peer.destroyed && roomCodeGlobal) {
+                if (!conn || !conn.open || !isConnectionHealthy()) {
+                    if (conn) {
+                        try { conn.close(); } catch (e) {}
+                    }
+                    conn = peer.connect(`manewry-morskie-${roomCodeGlobal}`);
+                    setupConnection();
+                }
+            }
         }
 
         function startHeartbeat() {
             if (heartbeatTimer) clearInterval(heartbeatTimer);
             heartbeatTimer = setInterval(() => {
+                if (!isConnectionHealthy()) {
+                    updateConnStatus(false);
+                    attemptReconnect();
+                    return;
+                }
                 if (conn && conn.open) {
                     sendData({ type: 'HEARTBEAT', turnNumber, phase });
                 }
@@ -486,13 +531,8 @@
 
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && phase !== 'lobby') {
-                if (peer && peer.disconnected) {
-                    peer.reconnect();
-                }
-                if (myColor === 'red' && (!conn || !conn.open) && peer && !peer.destroyed && roomCodeGlobal) {
-                    conn = peer.connect(`manewry-morskie-${roomCodeGlobal}`);
-                    setupConnection();
-                } else if (conn && conn.open) {
+                attemptReconnect();
+                if (conn && conn.open) {
                     sendData({ type: 'HEARTBEAT', turnNumber, phase });
                 }
             }
@@ -1127,7 +1167,15 @@
                 renderBoard();
                 updateUI();
             } else if (data.type === 'HEARTBEAT') {
-                if (phase === 'battle' && data.turnNumber < turnNumber) {
+                if (phase === 'battle') {
+                    if (data.turnNumber < turnNumber) {
+                        sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
+                    } else if (data.turnNumber > turnNumber) {
+                        sendData({ type: 'REQUEST_SYNC' });
+                    }
+                }
+            } else if (data.type === 'REQUEST_SYNC') {
+                if (phase === 'battle') {
                     sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
                 }
             }
