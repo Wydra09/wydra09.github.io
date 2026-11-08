@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Manewry Morskie Online</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
@@ -316,75 +315,30 @@
     <!-- TOAST POWIADOMIEŃ -->
     <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-slate-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-2xl text-center max-w-[90vw]"></div>
 
-    <script>
-        // ==========================================
-        // 1. STAŁE I DEFINICJE JEDNOSTEK
-        // ==========================================
-        const COLS = 18; // A-R (0-17)
-        const ROWS = 12; // 1-12 (0-11)
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const UNIT_TYPES = {
-            PN: { code: 'PN', name: 'Pancernik', move: 2, count: 3, desc: 'Ruch: 2 pola. Ulega tylko Okrętowi podwodnemu.' },
-            OR: { code: 'OR', name: 'Okręt rakietowy', move: 1, count: 3, desc: 'Ruch: 1 pole. Niszczy Baterie nabrzeżne.' },
-            KR: { code: 'KR', name: 'Krążownik', move: 2, count: 3, desc: 'Ruch: 2 pola. Ulega PN, OR i OP.' },
-            NI: { code: 'NI', name: 'Niszczyciel', move: 4, count: 4, desc: 'Ruch: 4 pola. Szybki okręt zwiadowczy.' },
-            OP: { code: 'OP', name: 'Okręt podwodny', move: 2, count: 4, desc: 'Ruch: 2 pola. Niszczy Pancerniki i Rakietowe.' },
-            ES: { code: 'ES', name: 'Eskortowiec', move: 3, count: 4, desc: 'Ruch: 3 pola. Zwalcza Okręty podwodne.' },
-            TR: { code: 'TR', name: 'Trałowiec', move: 2, count: 4, desc: 'Ruch: 2 pola. Stawia i usuwa Miny.' },
-            OD: { code: 'OD', name: 'Okręt desantowy', move: 1, count: 1, desc: 'Ruch: 1 pole. Musi dotrzeć do portu wroga.' },
-            BN: { code: 'BN', name: 'Bateria nabrzeżna', move: 0, count: 4, desc: 'Stała obrona portu. Blokuje przejście w zasięgu 1 pola.' },
-            MN: { code: 'MN', name: 'Mina', move: 0, count: 6, desc: 'Pułapka. Niszczy każdy okręt oprócz Trałowca.' }
+        const firebaseConfig = {
+            apiKey: "AIzaSyAxLxTRTy2KWyiLkhkO3CsYNL3H0PUrjaY",
+            authDomain: "morskie-c674c.firebaseapp.com",
+            projectId: "morskie-c674c",
+            storageBucket: "morskie-c674c.firebasestorage.app",
+            messagingSenderId: "554718232503",
+            appId: "1:554718232503:web:6491d509ab22d7e45d3232",
+            measurementId: "G-BTECDWWCRC"
         };
 
-        // Współrzędne pomocnicze (np. "D2" -> {c: 3, r: 1})
-        function parseCoord(str) {
-            const c = str.charCodeAt(0) - 65;
-            const r = parseInt(str.slice(1), 10) - 1;
-            return { c, r };
-        }
-        function toCoord(c, r) {
-            return String.fromCharCode(65 + c) + (r + 1);
-        }
-
-        // Stałe pozycje baterii
-        const YELLOW_BATTERIES = ['D2', 'D4', 'B9', 'C11'];
-        const RED_BATTERIES = ['P2', 'Q4', 'O9', 'O11'];
-
-        // Wejścia do portów (jedyne miejsca wyjścia i desantu)
-        const YELLOW_ENTRANCES = ['D3', 'B10'];
-        const RED_ENTRANCES = ['Q3', 'O10'];
-
-        // Wyspa (4 pola na środku: I6, J6, I7, J7)
-        const ISLAND_CELLS = new Set(['I6', 'J6', 'I7', 'J7']);
-
-        // Wody neutralne wokół wyspy
-        const NEUTRAL_CELLS = new Set([
-            'H5', 'I5', 'J5',
-            'H6', 'K6', 'L6',
-            'G7', 'H7', 'K7',
-            'I8', 'J8', 'K8'
-        ]);
-
-        // Linie brzegowe (ściany)
-        const WALLS = {};
-        function addWall(coord, side) {
-            if (!WALLS[coord]) WALLS[coord] = new Set();
-            WALLS[coord].add(side);
-        }
-        // Żółty brzeg
-        ['D1', 'D2', 'D4', 'D5', 'B6', 'B7', 'B8', 'B9', 'C11', 'C12'].forEach(c => addWall(c, 'right'));
-        ['D2', 'D5', 'C5', 'B9'].forEach(c => addWall(c, 'bottom'));
-        ['D4', 'B11', 'C11'].forEach(c => addWall(c, 'top'));
-        // Czerwony brzeg
-        ['P1', 'P2', 'Q4', 'Q5', 'Q6', 'Q7', 'O8', 'O9', 'O11', 'O12'].forEach(c => addWall(c, 'left'));
-        ['P2', 'Q2', 'O9'].forEach(c => addWall(c, 'bottom'));
-        ['Q4', 'O8', 'P8', 'O11'].forEach(c => addWall(c, 'top'));
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
         // ==========================================
-        // 2. STAN GRY I POŁĄCZENIE P2P
+        // 1. STAŁE I DEFINICJE JEDNOSTEK
+// ... existing code ... -->
         // ==========================================
-        let peer = null;
-        let conn = null;
+        // 2. STAN GRY I POŁĄCZENIE FIREBASE
+        // ==========================================
+        let unsubscribeGame = null;
         let myColor = null; // 'yellow' | 'red'
         let phase = 'lobby'; // 'lobby' | 'setup' | 'battle' | 'gameover'
         let currentTurn = 'yellow';
@@ -403,71 +357,41 @@
         let lastEventText = 'Bitwa rozpoczęta!';
         let minesPlacedCount = { yellow: 0, red: 0 };
         let turnNumber = 0;
-        let heartbeatTimer = null;
         let roomCodeGlobal = null;
-        let lastHeartbeatReceived = Date.now();
+        let lastSyncId = 0;
 
         // ==========================================
-        // 3. INICJALIZACJA P2P (PEERJS)
+        // 3. INICJALIZACJA POŁĄCZENIA (FIRESTORE)
         // ==========================================
-        const PEER_CONFIG = {
-            config: {
-                iceCandidatePoolSize: 10,
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:443',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    }
-                ]
-            }
-        };
-
         const btnCreateRoom = document.getElementById('btn-create-room');
         const btnJoinRoom = document.getElementById('btn-join-room');
         const inputRoomCode = document.getElementById('input-room-code');
 
-        btnCreateRoom.addEventListener('click', () => {
-            if (typeof Peer === 'undefined') {
-                showToast('Błąd: Biblioteka PeerJS nie została załadowana. Odśwież stronę.');
-                return;
-            }
+        btnCreateRoom.addEventListener('click', async () => {
             const code = Math.floor(1000 + Math.random() * 9000).toString();
             roomCodeGlobal = code;
-            const peerId = `manewry-morskie-${code}`;
             myColor = 'yellow';
 
             document.getElementById('lobby-actions').classList.add('hidden');
             document.getElementById('lobby-waiting').classList.remove('hidden');
             document.getElementById('display-room-code').textContent = code;
 
-            peer = new Peer(peerId, PEER_CONFIG);
-            peer.on('connection', (c) => {
-                conn = c;
-                setupConnection();
-            });
-            peer.on('error', (err) => {
-                showToast('Błąd połączenia: ' + err.type);
-            });
+            try {
+                await setDoc(doc(db, 'games', code), {
+                    status: 'waiting',
+                    redJoined: false,
+                    yellowReady: false,
+                    redReady: false,
+                    turnNumber: 0,
+                    createdAt: Date.now()
+                });
+                listenToGameRoom(code);
+            } catch (err) {
+                showToast('Błąd Firebase: ' + err.message);
+            }
         });
 
-        btnJoinRoom.addEventListener('click', () => {
-            if (typeof Peer === 'undefined') {
-                showToast('Błąd: Biblioteka PeerJS nie została załadowana. Odśwież stronę.');
-                return;
-            }
+        btnJoinRoom.addEventListener('click', async () => {
             const code = inputRoomCode.value.trim();
             if (code.length !== 4) {
                 showToast('Wpisz 4-cyfrowy kod pokoju!');
@@ -475,45 +399,84 @@
             }
             roomCodeGlobal = code;
             myColor = 'red';
-            peer = new Peer(PEER_CONFIG);
-            peer.on('open', () => {
-                showToast('Łączenie z pokojem...');
-                conn = peer.connect(`manewry-morskie-${code}`, { reliable: true });
-                setupConnection();
-                setTimeout(() => {
-                    if (phase === 'lobby' && (!conn || !conn.open)) {
-                        showToast('Sieć 5G blokuje bezpośrednie połączenie (TURN nie odpowiada). Spróbuj ponownie lub użyj Wi-Fi.');
-                    }
-                }, 10000);
-            });
-            peer.on('error', (err) => {
-                showToast('Nie można dołączyć: ' + err.type);
-            });
+            showToast('Łączenie z pokojem...');
+
+            try {
+                const gameRef = doc(db, 'games', code);
+                const snap = await getDoc(gameRef);
+                if (!snap.exists()) {
+                    showToast('Nie znaleziono pokoju o takim kodzie!');
+                    return;
+                }
+                await updateDoc(gameRef, { redJoined: true, status: 'setup' });
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('game-screen').classList.remove('hidden');
+                initGame();
+                listenToGameRoom(code);
+            } catch (err) {
+                showToast('Nie można dołączyć: ' + err.message);
+            }
         });
 
-        function setupConnection() {
-            conn.on('open', () => {
-                lastHeartbeatReceived = Date.now();
+        function listenToGameRoom(code) {
+            if (unsubscribeGame) unsubscribeGame();
+            const gameRef = doc(db, 'games', code);
+            unsubscribeGame = onSnapshot(gameRef, (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
                 updateConnStatus(true);
 
-                if (phase === 'lobby') {
+                // Gracz żółty wchodzi do gry, gdy czerwony dołączył
+                if (phase === 'lobby' && myColor === 'yellow' && data.redJoined) {
                     document.getElementById('lobby-screen').classList.add('hidden');
                     document.getElementById('game-screen').classList.remove('hidden');
                     initGame();
-                } else {
-                    showToast('Połączenie przywrócone!');
-                    sendData({ type: 'HEARTBEAT', turnNumber, phase });
                 }
-                startHeartbeat();
-            });
-            conn.on('data', (data) => {
-                lastHeartbeatReceived = Date.now();
-                updateConnStatus(true);
-                handleNetworkData(data);
-            });
-            conn.on('close', () => {
+
+                // Faza ustawiania: odbiór jednostek przeciwnika
+                if (phase === 'setup') {
+                    if (myColor === 'yellow' && data.redReady && !enemyReady && data.redUnits) {
+                        Object.keys(data.redUnits).forEach(coord => {
+                            board[coord] = data.redUnits[coord];
+                        });
+                        enemyReady = true;
+                        checkBothReady();
+                    } else if (myColor === 'red' && data.yellowReady && !enemyReady && data.yellowUnits) {
+                        Object.keys(data.yellowUnits).forEach(coord => {
+                            board[coord] = data.yellowUnits[coord];
+                        });
+                        enemyReady = true;
+                        checkBothReady();
+                    }
+                }
+
+                // Faza bitwy: synchronizacja planszy
+                if (data.board && data.syncId && data.syncId !== lastSyncId) {
+                    const isNewerTurn = typeof data.turnNumber === 'number' && data.turnNumber > turnNumber;
+                    if (data.force || isNewerTurn || (data.turnNumber === turnNumber && data.currentTurn !== currentTurn)) {
+                        lastSyncId = data.syncId;
+                        board = data.board;
+                        currentTurn = data.currentTurn;
+                        if (typeof data.turnNumber === 'number') turnNumber = data.turnNumber;
+                        if (data.lastEvent) lastEventText = data.lastEvent;
+                        if (data.minesPlacedCount) minesPlacedCount = data.minesPlacedCount;
+                        pendingAction = null;
+                        selectedCell = null;
+                        if (phase === 'setup') {
+                            myReady = true;
+                            enemyReady = true;
+                            phase = 'battle';
+                            document.getElementById('dock-overlay').classList.add('hidden');
+                        }
+                        checkWinConditions();
+                        renderBoard();
+                        updateUI();
+                        if (data.force) showToast('Zsynchronizowano stan gry!');
+                    }
+                }
+            }, (err) => {
                 updateConnStatus(false);
-                showToast('Utracono połączenie! Próba wznowienia...');
+                showToast('Błąd synchronizacji: ' + err.message);
             });
         }
 
@@ -530,789 +493,67 @@
             }
         }
 
-        function isConnectionHealthy() {
-            if (!conn || !conn.open) return false;
-            if (conn.peerConnection) {
-                const state = conn.peerConnection.iceConnectionState;
-                if (state === 'disconnected' || state === 'failed' || state === 'closed') return false;
-            }
-            return (Date.now() - lastHeartbeatReceived) < 8000;
-        }
-
-        function attemptReconnect() {
-            if (peer && peer.disconnected && !peer.destroyed) {
-                peer.reconnect();
-            }
-            if (myColor === 'red' && peer && !peer.destroyed && roomCodeGlobal) {
-                if (!conn || !conn.open || !isConnectionHealthy()) {
-                    if (conn) {
-                        try { conn.close(); } catch (e) {}
+        async function forceSync() {
+            if (!roomCodeGlobal) return;
+            showToast('Pobieranie najnowszego stanu z chmury...');
+            try {
+                const snap = await getDoc(doc(db, 'games', roomCodeGlobal));
+                if (snap.exists()) {
+                    const data = snap.data();
+                    if (data.board) {
+                        board = data.board;
+                        currentTurn = data.currentTurn;
+                        turnNumber = data.turnNumber || turnNumber;
+                        lastEventText = data.lastEvent || lastEventText;
+                        minesPlacedCount = data.minesPlacedCount || minesPlacedCount;
+                        pendingAction = null;
+                        selectedCell = null;
+                        renderBoard();
+                        updateUI();
+                        updateConnStatus(true);
+                        showToast('Stan gry odświeżony!');
                     }
-                    conn = peer.connect(`manewry-morskie-${roomCodeGlobal}`);
-                    setupConnection();
                 }
-            }
-        }
-
-        function startHeartbeat() {
-            if (heartbeatTimer) clearInterval(heartbeatTimer);
-            heartbeatTimer = setInterval(() => {
-                if (!isConnectionHealthy()) {
-                    updateConnStatus(false);
-                    attemptReconnect();
-                    return;
-                }
-                if (conn && conn.open) {
-                    sendData({ type: 'HEARTBEAT', turnNumber, phase, currentTurn });
-                }
-            }, 3000);
-        }
-
-        function forceSync() {
-            showToast('Odświeżanie połączenia i tury...');
-            attemptReconnect();
-            if (conn && conn.open) {
-                sendData({ type: 'HEARTBEAT', turnNumber, phase, currentTurn });
-                sendData({ type: 'REQUEST_SYNC' });
+            } catch (err) {
+                updateConnStatus(false);
+                showToast('Brak połączenia z chmurą.');
             }
         }
         window.forceSync = forceSync;
 
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && phase !== 'lobby') {
-                attemptReconnect();
-                if (conn && conn.open) {
-                    sendData({ type: 'HEARTBEAT', turnNumber, phase, currentTurn });
+        async function sendData(payload) {
+            if (!roomCodeGlobal) return;
+            const gameRef = doc(db, 'games', roomCodeGlobal);
+            try {
+                if (payload.type === 'READY') {
+                    if (myColor === 'yellow') {
+                        await updateDoc(gameRef, { yellowReady: true, yellowUnits: payload.units });
+                    } else {
+                        await updateDoc(gameRef, { redReady: true, redUnits: payload.units });
+                    }
+                } else if (payload.type === 'SYNC_BOARD') {
+                    const syncId = Date.now() + Math.random();
+                    lastSyncId = syncId;
+                    await updateDoc(gameRef, {
+                        board: payload.board,
+                        currentTurn: payload.currentTurn,
+                        lastEvent: payload.lastEvent,
+                        minesPlacedCount: payload.minesPlacedCount,
+                        turnNumber: payload.turnNumber,
+                        force: !!payload.force,
+                        syncId
+                    });
                 }
+            } catch (err) {
+                showToast('Błąd zapisu ruchu: ' + err.message);
             }
-        });
-
-        function sendData(payload) {
-            if (conn && conn.open) conn.send(payload);
         }
 
         // ==========================================
         // 4. INICJALIZACJA PLANSZY I DOKU
         // ==========================================
-        function isYellowPort(c, r) {
-            if (c <= 1) return true;
-            if (c === 2 && (r <= 4 || r >= 10)) return true;
-            if (c === 3 && r <= 4) return true;
-            return false;
-        }
-        function isRedPort(c, r) {
-            if (c >= 16) return true;
-            if (c === 15 && (r <= 1 || r >= 7)) return true;
-            if (c === 14 && r >= 7) return true;
-            return false;
-        }
-
-        function initGame() {
-            phase = 'setup';
-            board = {};
-
-            // Ustawienie stałych baterii
-            YELLOW_BATTERIES.forEach((coord, i) => {
-                board[coord] = { id: `y-bn-${i}`, type: 'BN', owner: 'yellow', revealed: true, neutralTurns: 0 };
-            });
-            RED_BATTERIES.forEach((coord, i) => {
-                board[coord] = { id: `r-bn-${i}`, type: 'BN', owner: 'red', revealed: true, neutralTurns: 0 };
-            });
-
-            // Inicjalizacja doku (26 okrętów)
-            dockCounts = { PN: 3, OR: 3, KR: 3, NI: 4, OP: 4, ES: 4, TR: 4, OD: 1 };
-
-            // Pozycjonowanie nakładki DOK nad portem przeciwnika
-            const dockOverlay = document.getElementById('dock-overlay');
-            dockOverlay.classList.remove('hidden');
-            if (myColor === 'yellow') {
-                dockOverlay.classList.add('right-1');
-                dockOverlay.classList.remove('left-1');
-            } else {
-                dockOverlay.classList.add('left-1');
-                dockOverlay.classList.remove('right-1');
-            }
-
-            renderBoard();
-            renderDock();
-            updateUI();
-        }
-
-        function renderBoard() {
-            const grid = document.getElementById('board-grid');
-            grid.innerHTML = '';
-
-            // Obliczanie podświetleń
-            let validMoves = new Set();
-            let validAttacks = new Set();
-            let validMines = new Set();
-
-            if (phase === 'battle' && currentTurn === myColor && selectedCell) {
-                const unit = board[selectedCell];
-                if (unit && unit.owner === myColor) {
-                    if (placingMineMode && unit.type === 'TR') {
-                        validMines = getAdjacentMineCells(selectedCell);
-                    } else if (!pendingAction && unit.type !== 'BN' && unit.type !== 'MN') {
-                        const res = getValidMovesAndAttacks(selectedCell, unit);
-                        validMoves = res.moves;
-                        validAttacks = res.attacks;
-                    }
-                }
-            }
-
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = 0; c < COLS; c++) {
-                    const coord = toCoord(c, r);
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    cell.dataset.coord = coord;
-
-                    if (ISLAND_CELLS.has(coord)) {
-                        cell.classList.add('cell-island');
-                        if (phase === 'battle' && currentTurn === myColor) {
-                            cell.classList.add('cell-island-active');
-                            const pulse = document.createElement('span');
-                            pulse.className = 'text-[8px] sm:text-[10px] font-black text-center leading-none pointer-events-none';
-                            pulse.textContent = (coord === 'I6' || coord === 'J6') ? 'TWOJA' : 'TURA';
-                            cell.appendChild(pulse);
-                        }
-                    } else if (NEUTRAL_CELLS.has(coord)) {
-                        cell.classList.add('cell-neutral');
-                    } else if (isYellowPort(c, r)) {
-                        cell.classList.add('cell-port-yellow');
-                    } else if (isRedPort(c, r)) {
-                        cell.classList.add('cell-port-red');
-                    } else {
-                        cell.classList.add('cell-sea');
-                    }
-
-                    // Białe linie brzegowe
-                    if (WALLS[coord]) {
-                        WALLS[coord].forEach(side => cell.classList.add(`wall-${side}`));
-                    }
-
-                    // Podświetlenia
-                    if (selectedCell === coord) cell.classList.add('highlight-selected');
-                    if (pendingAction && pendingAction.to === coord) cell.classList.add('highlight-pending');
-                    if (validMoves.has(coord)) cell.classList.add('highlight-move');
-                    if (validAttacks.has(coord)) cell.classList.add('highlight-attack');
-                    if (validMines.has(coord)) cell.classList.add('highlight-mine');
-
-                    // Pionek
-                    const unit = board[coord];
-                    if (unit) {
-                        const token = document.createElement('div');
-                        token.className = `unit-token ${unit.owner === 'yellow' ? 'token-yellow' : 'token-red'}`;
-                        if (unit.type === 'BN') token.classList.add('token-battery');
-                        if (unit.revealed && unit.type !== 'BN') token.classList.add('token-revealed');
-
-                        if (unit.owner === myColor || unit.revealed) {
-                            token.textContent = unit.type;
-                        } else {
-                            token.textContent = '?';
-                        }
-                        cell.appendChild(token);
-                    }
-
-                    cell.addEventListener('click', () => onCellClick(coord, c, r));
-                    grid.appendChild(cell);
-                }
-            }
-        }
-
-        function renderDock() {
-            const list = document.getElementById('dock-list');
-            list.innerHTML = '';
-            let total = 0;
-
-            Object.keys(dockCounts).forEach(type => {
-                const count = dockCounts[type];
-                total += count;
-                const info = UNIT_TYPES[type];
-
-                const btn = document.createElement('button');
-                btn.className = `w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-bold border transition ${
-                    selectedDockType === type
-                        ? 'bg-sky-600 border-sky-400 text-white'
-                        : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
-                }`;
-                if (count === 0) btn.classList.add('opacity-40');
-
-                btn.innerHTML = `<span>${info.name} (${type})</span><span class="bg-slate-900 px-1.5 py-0.5 rounded text-[10px]">${count}</span>`;
-                btn.addEventListener('click', () => {
-                    if (count > 0) {
-                        selectedDockType = type;
-                        renderDock();
-                    }
-                });
-                list.appendChild(btn);
-            });
-
-            document.getElementById('dock-remaining').textContent = `Pozostało: ${total}`;
-            document.getElementById('btn-confirm-setup').disabled = total > 0 || myReady;
-        }
-
+        // 8. ODBIÓR DANYCH Z SIECI (obsługiwany przez onSnapshot w sekcji 3)
         // ==========================================
-        // 5. OBSŁUGA KLIKNIĘĆ I USTAWIANIA
-        // ==========================================
-        function onCellClick(coord, c, r) {
-            if (phase === 'setup') {
-                if (myReady) return;
-                const isMyPort = myColor === 'yellow' ? isYellowPort(c, r) : isRedPort(c, r);
-                if (!isMyPort) {
-                    showToast('Ustawiaj statki wyłącznie we własnym porcie!');
-                    return;
-                }
-                const existing = board[coord];
-                if (existing) {
-                    if (existing.type === 'BN') {
-                        showToast('Baterie mają stałą pozycję!');
-                        return;
-                    }
-                    // Zwrot statku do doku
-                    dockCounts[existing.type]++;
-                    delete board[coord];
-                    renderBoard();
-                    renderDock();
-                    return;
-                }
-                if (selectedDockType && dockCounts[selectedDockType] > 0) {
-                    board[coord] = {
-                        id: `${myColor}-${selectedDockType}-${Date.now()}-${Math.random()}`,
-                        type: selectedDockType,
-                        owner: myColor,
-                        revealed: false,
-                        neutralTurns: 0
-                    };
-                    dockCounts[selectedDockType]--;
-                    if (dockCounts[selectedDockType] === 0) selectedDockType = null;
-                    renderBoard();
-                    renderDock();
-                } else {
-                    showToast('Wybierz statek z Doku!');
-                }
-                return;
-            }
-
-            if (phase === 'battle') {
-                const clickedUnit = board[coord];
-
-                // Podgląd własnego statku możliwy również w turze przeciwnika
-                if (currentTurn !== myColor) {
-                    if (clickedUnit && clickedUnit.owner === myColor) {
-                        selectedCell = coord;
-                        placingMineMode = false;
-                        renderBoard();
-                        updateUI();
-                    } else {
-                        selectedCell = null;
-                        placingMineMode = false;
-                        renderBoard();
-                        updateUI();
-                        showToast('Poczekaj na ruch przeciwnika!');
-                    }
-                    return;
-                }
-                if (pendingAction) {
-                    if (placingMineMode && pendingAction.type === 'move' && board[pendingAction.to]?.type === 'TR') {
-                        const validMines = getAdjacentMineCells(pendingAction.to);
-                        if (validMines.has(coord)) {
-                            if (minesPlacedCount[myColor] >= 6) {
-                                showToast('Wykorzystałeś już wszystkie 6 min!');
-                                placingMineMode = false;
-                                renderBoard();
-                                return;
-                            }
-                            board[coord] = {
-                                id: `${myColor}-MN-${Date.now()}`,
-                                type: 'MN',
-                                owner: myColor,
-                                revealed: false,
-                                neutralTurns: 0
-                            };
-                            minesPlacedCount[myColor]++;
-                            pendingAction.minePlacedAfterMove = true;
-                            placingMineMode = false;
-                            showToast('Postawiono minę po ruchu! Kliknij Potwierdź, aby zakończyć turę.');
-                            renderBoard();
-                            updateUI();
-                            return;
-                        }
-                    }
-                    showToast('Kliknij Potwierdź lub Anuluj swój ruch!');
-                    return;
-                }
-
-                // Jeśli mamy już wybrany statek i klikamy w pole ruchu/ataku/miny
-                if (selectedCell) {
-                    const myUnit = board[selectedCell];
-                    if (placingMineMode && myUnit && myUnit.type === 'TR') {
-                        const validMines = getAdjacentMineCells(selectedCell);
-                        if (validMines.has(coord)) {
-                            if (minesPlacedCount[myColor] >= 6) {
-                                showToast('Wykorzystałeś już wszystkie 6 min!');
-                                placingMineMode = false;
-                                renderBoard();
-                                return;
-                            }
-                            board[coord] = {
-                                id: `${myColor}-MN-${Date.now()}`,
-                                type: 'MN',
-                                owner: myColor,
-                                revealed: false,
-                                neutralTurns: 0
-                            };
-                            minesPlacedCount[myColor]++;
-                            placingMineMode = false;
-                            turnNumber++;
-                            lastEventText = `${myColor === 'yellow' ? 'Żółty' : 'Czerwony'} postawił minę (nie liczy się za ruch).`;
-                            showToast('Postawiono minę! Możesz teraz wykonać ruch.');
-                            sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
-                            renderBoard();
-                            updateUI();
-                            return;
-                        }
-                    } else if (myUnit && myUnit.owner === myColor && myUnit.type !== 'BN' && myUnit.type !== 'MN') {
-                        const { moves, attacks } = getValidMovesAndAttacks(selectedCell, myUnit);
-                        if (moves.has(coord) || attacks.has(coord)) {
-                            pendingAction = {
-                                type: attacks.has(coord) ? 'attack' : 'move',
-                                from: selectedCell,
-                                to: coord,
-                                snapshot: JSON.parse(JSON.stringify(board)),
-                                minePlacedAfterMove: false
-                            };
-                            // Podgląd lokalny ruchu
-                            if (moves.has(coord)) {
-                                board[coord] = board[selectedCell];
-                                delete board[selectedCell];
-                            }
-                            selectedCell = moves.has(coord) && board[coord]?.type === 'TR' ? coord : null;
-                            renderBoard();
-                            updateUI();
-                            return;
-                        }
-                    }
-                }
-
-                // Zaznaczenie własnej jednostki
-                if (clickedUnit && clickedUnit.owner === myColor) {
-                    selectedCell = coord;
-                    placingMineMode = false; // Reset trybu min przy zmianie jednostki
-                    renderBoard();
-                    updateUI();
-                } else {
-                    selectedCell = null;
-                    placingMineMode = false;
-                    renderBoard();
-                    updateUI();
-                }
-            }
-        }
-
-        // Losowe ustawienie statków w porcie
-        document.getElementById('btn-random-setup').addEventListener('click', () => {
-            if (myReady) return;
-            // Wyczyść własne statki (zostaw baterie)
-            Object.keys(board).forEach(coord => {
-                if (board[coord].owner === myColor && board[coord].type !== 'BN') {
-                    dockCounts[board[coord].type]++;
-                    delete board[coord];
-                }
-            });
-
-            const freePortCells = [];
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = 0; c < COLS; c++) {
-                    const isMyPort = myColor === 'yellow' ? isYellowPort(c, r) : isRedPort(c, r);
-                    const coord = toCoord(c, r);
-                    if (isMyPort && !board[coord]) freePortCells.push(coord);
-                }
-            }
-
-            // Tasowanie
-            freePortCells.sort(() => Math.random() - 0.5);
-
-            Object.keys(dockCounts).forEach(type => {
-                while (dockCounts[type] > 0 && freePortCells.length > 0) {
-                    const coord = freePortCells.pop();
-                    board[coord] = {
-                        id: `${myColor}-${type}-${Date.now()}-${Math.random()}`,
-                        type: type,
-                        owner: myColor,
-                        revealed: false,
-                        neutralTurns: 0
-                    };
-                    dockCounts[type]--;
-                }
-            });
-
-            selectedDockType = null;
-            renderBoard();
-            renderDock();
-        });
-
-        // Potwierdzenie gotowości do bitwy
-        document.getElementById('btn-confirm-setup').addEventListener('click', () => {
-            myReady = true;
-            document.getElementById('btn-confirm-setup').disabled = true;
-            document.getElementById('btn-random-setup').disabled = true;
-
-            // Wyślij swoje ustawienie do przeciwnika
-            const myUnits = {};
-            Object.keys(board).forEach(coord => {
-                if (board[coord].owner === myColor) myUnits[coord] = board[coord];
-            });
-            sendData({ type: 'READY', units: myUnits });
-            checkBothReady();
-        });
-
-        function checkBothReady() {
-            if (myReady && enemyReady) {
-                phase = 'battle';
-                document.getElementById('dock-overlay').classList.add('hidden');
-                showToast('Bitwa rozpoczęta! Zaczyna Gracz Żółty.');
-                renderBoard();
-                updateUI();
-            } else if (myReady) {
-                document.getElementById('turn-indicator').textContent = 'Czekam na wroga...';
-            }
-        }
-
-        // ==========================================
-        // 6. LOGIKA RUCHU, BATERII, MIN I WALKI
-        // ==========================================
-        function isBlockedByWall(c1, r1, c2, r2) {
-            const coord1 = toCoord(c1, r1);
-            const coord2 = toCoord(c2, r2);
-            const dc = c2 - c1;
-            const dr = r2 - r1;
-
-            if (dc === 1 && WALLS[coord1]?.has('right')) return true;
-            if (dc === -1 && WALLS[coord1]?.has('left')) return true;
-            if (dr === 1 && WALLS[coord1]?.has('bottom')) return true;
-            if (dr === -1 && WALLS[coord1]?.has('top')) return true;
-
-            if (dc === 1 && WALLS[coord2]?.has('left')) return true;
-            if (dc === -1 && WALLS[coord2]?.has('right')) return true;
-            if (dr === 1 && WALLS[coord2]?.has('top')) return true;
-            if (dr === -1 && WALLS[coord2]?.has('bottom')) return true;
-
-            return false;
-        }
-
-        function isInEnemyBatteryRange(coord, myOwner) {
-            const { c, r } = parseCoord(coord);
-            for (let dr = -1; dr <= 1; dr++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                    if (dc === 0 && dr === 0) continue;
-                    const nc = c + dc, nr = r + dr;
-                    if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS) {
-                        const nCoord = toCoord(nc, nr);
-                        const u = board[nCoord];
-                        if (u && u.type === 'BN' && u.owner !== myOwner) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        function getValidMovesAndAttacks(startCoord, unit) {
-            const moves = new Set();
-            const attacks = new Set();
-            const maxSteps = UNIT_TYPES[unit.type].move;
-            const { c: sc, r: sr } = parseCoord(startCoord);
-
-            const dirs = [
-                [-1,-1], [0,-1], [1,-1],
-                [-1, 0],         [1, 0],
-                [-1, 1], [0, 1], [1, 1]
-            ];
-
-            dirs.forEach(([dc, dr]) => {
-                let cc = sc, cr = sr;
-                for (let step = 1; step <= maxSteps; step++) {
-                    const nc = cc + dc;
-                    const nr = cr + dr;
-                    if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
-
-                    const nCoord = toCoord(nc, nr);
-                    if (ISLAND_CELLS.has(nCoord)) break;
-
-                    const target = board[nCoord];
-
-                    // Sprawdź ściany (ruch po skosie nie może przeciąć żadnego z 4 boków rogu)
-                    let wallBlocked = false;
-                    if (dc !== 0 && dr !== 0) {
-                        wallBlocked = isBlockedByWall(cc, cr, nc, cr) || isBlockedByWall(cc, cr, cc, nr) ||
-                                      isBlockedByWall(nc, cr, nc, nr) || isBlockedByWall(cc, nr, nc, nr);
-                    } else {
-                        wallBlocked = isBlockedByWall(cc, cr, nc, nr);
-                    }
-
-                    // Wyjątek: Okręt rakietowy może zniszczyć Baterię nabrzeżną przez linię brzegową bez jej przekraczania
-                    if (wallBlocked) {
-                        if (unit.type === 'OR' && target && target.owner !== unit.owner && target.type === 'BN') {
-                            if (!NEUTRAL_CELLS.has(nCoord) && !NEUTRAL_CELLS.has(startCoord)) {
-                                attacks.add(nCoord);
-                            }
-                        }
-                        break;
-                    }
-
-                    if (target) {
-                        if (target.owner !== unit.owner) {
-                            // Na wodach neutralnych nie można atakować
-                            if (!NEUTRAL_CELLS.has(nCoord) && !NEUTRAL_CELLS.has(startCoord)) {
-                                if (unit.type !== 'OD') attacks.add(nCoord);
-                            }
-                        }
-                        break; // Nie można przeskakiwać jednostek
-                    } else {
-                        // Bateria blokuje przejście (chyba że to Okręt rakietowy atakujący baterię, ale tu pole jest puste)
-                        if (isInEnemyBatteryRange(nCoord, unit.owner) && unit.type !== 'OR') {
-                            break;
-                        }
-                        moves.add(nCoord);
-                    }
-                    cc = nc; cr = nr;
-                }
-            });
-
-            return { moves, attacks };
-        }
-
-        function getAdjacentMineCells(coord) {
-            const res = new Set();
-            const { c, r } = parseCoord(coord);
-            for (let dr = -1; dr <= 1; dr++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                    if (dc === 0 && dr === 0) continue;
-                    const nc = c + dc, nr = r + dr;
-                    if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS) {
-                        const nCoord = toCoord(nc, nr);
-                        if (!ISLAND_CELLS.has(nCoord) && !NEUTRAL_CELLS.has(nCoord) && !board[nCoord]) {
-                            res.add(nCoord);
-                        }
-                    }
-                }
-            }
-            return res;
-        }
-
-        // Rozstrzyganie walki: zwraca 'attacker' | 'defender' | 'both'
-        function resolveCombat(att, def) {
-            if (def.type === 'MN') {
-                return att.type === 'TR' ? 'attacker' : 'both';
-            }
-            if (def.type === 'BN') {
-                return att.type === 'OR' ? 'attacker' : 'defender';
-            }
-            if (att.type === def.type) return 'both';
-
-            const rules = {
-                PN: ['OR', 'KR', 'NI', 'ES', 'TR', 'OD'],
-                OR: ['KR', 'NI', 'ES', 'TR', 'OD'],
-                KR: ['NI', 'ES', 'TR', 'OD'],
-                NI: ['OP', 'ES', 'TR', 'OD'], // Niszczyciel bije OP gdy atakuje pierwszy
-                OP: ['PN', 'OR', 'KR', 'NI'], // OP bije NI gdy atakuje pierwszy
-                ES: ['OP', 'TR', 'OD'],
-                TR: ['OD'],
-                OD: []
-            };
-            return rules[att.type]?.includes(def.type) ? 'attacker' : 'defender';
-        }
-
-        // ==========================================
-        // 7. POTWIERDZANIE / ANULOWANIE TURY
-        // ==========================================
-        document.getElementById('btn-place-mine').addEventListener('click', () => {
-            const trCoord = (pendingAction && pendingAction.type === 'move' && board[pendingAction.to]?.type === 'TR')
-                ? pendingAction.to
-                : selectedCell;
-            if (!trCoord || board[trCoord]?.type !== 'TR') return;
-            selectedCell = trCoord;
-            placingMineMode = !placingMineMode;
-            renderBoard();
-            updateUI();
-        });
-
-        document.getElementById('btn-cancel-turn').addEventListener('click', () => {
-            if (!pendingAction) return;
-            if (pendingAction.minePlacedAfterMove) {
-                minesPlacedCount[myColor] = Math.max(0, minesPlacedCount[myColor] - 1);
-            }
-            board = pendingAction.snapshot;
-            pendingAction = null;
-            selectedCell = null;
-            placingMineMode = false;
-            renderBoard();
-            updateUI();
-        });
-
-        document.getElementById('btn-confirm-turn').addEventListener('click', () => {
-            if (!pendingAction) return;
-            const act = pendingAction;
-            // Jeśli postawiono minę po ruchu, zachowaj ją na planszy; w przeciwnym razie przywróć czysty snapshot
-            if (!act.minePlacedAfterMove) {
-                board = act.snapshot;
-            }
-            const playerLabel = myColor === 'yellow' ? 'Żółty' : 'Czerwony';
-
-            if (act.type === 'move') {
-                if (!act.minePlacedAfterMove) {
-                    const movedUnit = board[act.from];
-                    board[act.to] = movedUnit;
-                    delete board[act.from];
-                }
-                lastEventText = act.minePlacedAfterMove
-                    ? `${playerLabel} wykonał ruch i postawił minę.`
-                    : `${playerLabel} wykonał ruch.`;
-            } else if (act.type === 'attack') {
-                const att = board[act.from];
-                const def = board[act.to];
-                att.revealed = true;
-                def.revealed = true;
-                const result = resolveCombat(att, def);
-
-                if (result === 'attacker') {
-                    if (def.type === 'BN') {
-                        // Okręt rakietowy niszczy baterię przez linię brzegową bez jej przekraczania
-                        delete board[act.to];
-                        lastEventText = `${playerLabel} (Okręt rakietowy) zniszczył Baterię nabrzeżną!`;
-                    } else {
-                        board[act.to] = att;
-                        delete board[act.from];
-                        lastEventText = `${playerLabel} (${UNIT_TYPES[att.type].name}) zniszczył: ${UNIT_TYPES[def.type].name}!`;
-                    }
-                    showToast(lastEventText);
-                } else if (result === 'defender') {
-                    delete board[act.from];
-                    lastEventText = `${playerLabel} (${UNIT_TYPES[att.type].name}) uległ jednostce: ${UNIT_TYPES[def.type].name}!`;
-                    showToast(lastEventText);
-                } else {
-                    delete board[act.from];
-                    delete board[act.to];
-                    lastEventText = `Remis! ${UNIT_TYPES[att.type].name} i ${UNIT_TYPES[def.type].name} toną.`;
-                    showToast(lastEventText);
-                }
-            }
-
-            // Zliczanie tur na wodach neutralnych dla wszystkich moich statków
-            updateAllNeutralTurnsForPlayer(myColor);
-
-            pendingAction = null;
-            selectedCell = null;
-            currentTurn = currentTurn === 'yellow' ? 'red' : 'yellow';
-            turnNumber++;
-
-            sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
-            checkWinConditions();
-            renderBoard();
-            updateUI();
-        });
-
-        function updateAllNeutralTurnsForPlayer(owner) {
-            Object.keys(board).forEach(coord => {
-                const u = board[coord];
-                if (!u || u.owner !== owner) return;
-                if (NEUTRAL_CELLS.has(coord)) {
-                    u.neutralTurns = (u.neutralTurns || 0) + 1;
-                    if (u.neutralTurns >= 4) {
-                        delete board[coord];
-                        lastEventText = `${UNIT_TYPES[u.type].name} został internowany na wodach neutralnych!`;
-                        showToast(lastEventText);
-                    }
-                } else {
-                    u.neutralTurns = 0;
-                }
-            });
-        }
-
-        function updateNeutralTurns(coord) {
-            const u = board[coord];
-            if (!u) return;
-            if (NEUTRAL_CELLS.has(coord)) {
-                u.neutralTurns = (u.neutralTurns || 0) + 1;
-                if (u.neutralTurns >= 4) {
-                    delete board[coord];
-                    lastEventText = `${UNIT_TYPES[u.type].name} został internowany na wodach neutralnych!`;
-                    showToast(lastEventText);
-                }
-            } else {
-                u.neutralTurns = 0;
-            }
-        }
-
-        function checkWinConditions() {
-            // 1. Czy Okręt desantowy dotarł do wejścia wroga?
-            const targetEntrances = myColor === 'yellow' ? RED_ENTRANCES : YELLOW_ENTRANCES;
-            for (const ent of targetEntrances) {
-                if (board[ent]?.type === 'OD' && board[ent]?.owner === myColor) {
-                    endGame(myColor, 'Okręt desantowy bezpiecznie wpłynął do portu przeciwnika!');
-                    return;
-                }
-            }
-
-            // 2. Policz OD i OR obu graczy
-            const counts = { yellow: { OD: 0, OR: 0 }, red: { OD: 0, OR: 0 } };
-            Object.values(board).forEach(u => {
-                if (u.type === 'OD') counts[u.owner].OD++;
-                if (u.type === 'OR') counts[u.owner].OR++;
-            });
-
-            if (counts.yellow.OD === 0) endGame('red', 'Gracz Żółty stracił Okręt desantowy!');
-            else if (counts.red.OD === 0) endGame('yellow', 'Gracz Czerwony stracił Okręt desantowy!');
-            else if (counts.yellow.OR === 0) endGame('red', 'Gracz Żółty stracił wszystkie Okręty rakietowe!');
-            else if (counts.red.OR === 0) endGame('yellow', 'Gracz Czerwony stracił wszystkie Okręty rakietowe!');
-        }
-
-        function endGame(winner, reason) {
-            phase = 'gameover';
-            document.getElementById('gameover-title').textContent = winner === myColor ? 'ZWYCIĘSTWO!' : 'PORAŻKA!';
-            document.getElementById('gameover-reason').textContent = reason;
-            document.getElementById('modal-gameover').classList.remove('hidden');
-        }
-
-        // ==========================================
-        // 8. ODBIÓR DANYCH Z SIECI
-        // ==========================================
-        function handleNetworkData(data) {
-            if (data.type === 'READY') {
-                Object.keys(data.units).forEach(coord => {
-                    board[coord] = data.units[coord];
-                });
-                enemyReady = true;
-                checkBothReady();
-            } else if (data.type === 'SYNC_BOARD') {
-                if (!data.force && typeof data.turnNumber === 'number' && data.turnNumber < turnNumber) {
-                    return;
-                }
-                board = data.board;
-                currentTurn = data.currentTurn;
-                if (typeof data.turnNumber === 'number') turnNumber = data.turnNumber;
-                if (data.lastEvent) lastEventText = data.lastEvent;
-                if (data.minesPlacedCount) minesPlacedCount = data.minesPlacedCount;
-                pendingAction = null;
-                selectedCell = null;
-                checkWinConditions();
-                renderBoard();
-                updateUI();
-                if (data.force) showToast('Przeciwnik wczytał zapisany stan gry!');
-            } else if (data.type === 'HEARTBEAT') {
-                if (phase === 'battle') {
-                    if (data.turnNumber < turnNumber) {
-                        sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
-                    } else if (data.turnNumber > turnNumber || data.currentTurn !== currentTurn) {
-                        sendData({ type: 'REQUEST_SYNC' });
-                    }
-                }
-            } else if (data.type === 'REQUEST_SYNC') {
-                if (phase === 'battle') {
-                    sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber });
-                }
-            }
-        }
 
         // ==========================================
         // 8B. ZAPIS I WCZYTYWANIE STANU GRY (.JSON)
