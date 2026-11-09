@@ -112,6 +112,23 @@
             background: linear-gradient(135deg, #fca5a5, #b91c1c);
             color: #ffffff;
         }
+        .token-yellow-key {
+            background: linear-gradient(135deg, #fde047, #ea580c);
+            color: #ffffff;
+            border: 2px solid #fef08a;
+        }
+        .token-red-key {
+            background: linear-gradient(135deg, #f43f5e, #881337);
+            color: #fde047;
+            border: 2px solid #fda4af;
+        }
+        .token-pc-name {
+            font-size: clamp(6px, 0.7vw, 9.5px);
+            line-height: 1.05;
+            text-align: center;
+            word-break: break-word;
+            padding: 1px;
+        }
         .token-battery {
             border-radius: 50%;
             border: 2px solid #1e293b;
@@ -127,7 +144,7 @@
     <div id="lobby-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 p-4">
         <div class="w-full max-w-md rounded-2xl bg-slate-800 p-6 shadow-2xl border border-slate-700 text-center">
             <h1 class="text-2xl font-extrabold text-sky-400 mb-1">MANEWRY MORSKIE</h1>
-            <p class="text-xs text-slate-400 mb-6">Gra taktyczna online (PeerJS P2P)</p>
+            <p class="text-xs text-slate-400 mb-6">Gra taktyczna online</p>
 
             <div id="lobby-actions" class="space-y-4">
                 <button id="btn-create-room" class="w-full py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-95 font-bold text-white shadow-lg transition">
@@ -967,14 +984,25 @@
                     const unit = board[coord];
                     if (unit) {
                         const token = document.createElement('div');
-                        token.className = `unit-token ${unit.owner === 'yellow' ? 'token-yellow' : 'token-red'}`;
+                        const isKeyUnit = unit.owner === myColor && (unit.type === 'OD' || unit.type === 'OR');
+                        let colorClass = unit.owner === 'yellow' ? 'token-yellow' : 'token-red';
+                        if (isKeyUnit) {
+                            colorClass = unit.owner === 'yellow' ? 'token-yellow-key' : 'token-red-key';
+                        }
+                        token.className = `unit-token ${colorClass}`;
                         if (unit.type === 'BN') token.classList.add('token-battery');
                         if (unit.revealed && unit.owner === myColor && unit.type !== 'BN') {
                             token.classList.add('token-revealed');
                         }
 
+                        const isPC = window.matchMedia('(pointer: fine)').matches && window.innerWidth >= 900;
                         if (unit.owner === myColor || unit.revealed) {
-                            token.textContent = unit.type;
+                            if (isPC) {
+                                token.classList.add('token-pc-name');
+                                token.textContent = UNIT_TYPES[unit.type].name;
+                            } else {
+                                token.textContent = unit.type;
+                            }
                         } else {
                             token.textContent = '?';
                         }
@@ -1148,6 +1176,105 @@
             document.getElementById('gameover-reason').textContent = reason;
             openModal('modal-gameover');
         }
+
+        function updateAllNeutralTurnsForPlayer(playerColor) {
+            Object.keys(board).forEach(c => {
+                const u = board[c];
+                if (u && u.owner === playerColor && u.type !== 'BN' && u.type !== 'MN') {
+                    if (NEUTRAL_CELLS.has(c)) {
+                        u.neutralTurns = (u.neutralTurns || 0) + 1;
+                        if (u.neutralTurns >= 4) {
+                            delete board[c];
+                            lastEventText = `${UNIT_TYPES[u.type].name} na ${c} został internowany na wodach neutralnych!`;
+                        }
+                    } else {
+                        u.neutralTurns = 0;
+                    }
+                }
+            });
+        }
+
+        function checkWinConditions() {
+            if (phase !== 'battle') return;
+
+            // Sprawdź czy Okręt desantowy (OD) wpłynął do portu przeciwnika
+            for (const c of Object.keys(board)) {
+                const u = board[c];
+                if (u.type === 'OD') {
+                    if (u.owner === 'yellow' && isRedPort(c)) {
+                        endGame('yellow', 'Żółty Okręt desantowy wpłynął do portu Czerwonych!');
+                        return;
+                    }
+                    if (u.owner === 'red' && isYellowPort(c)) {
+                        endGame('red', 'Czerwony Okręt desantowy wpłynął do portu Żółtych!');
+                        return;
+                    }
+                }
+            }
+
+            // Sprawdź czy któryś z graczy stracił OD lub wszystkie 3 OR
+            ['yellow', 'red'].forEach(color => {
+                const units = Object.values(board).filter(u => u.owner === color);
+                const hasOD = units.some(u => u.type === 'OD');
+                const hasOR = units.some(u => u.type === 'OR');
+                const winner = color === 'yellow' ? 'red' : 'yellow';
+                const loserName = color === 'yellow' ? 'Żółty' : 'Czerwony';
+
+                if (!hasOD) {
+                    endGame(winner, `${loserName} stracił Okręt desantowy!`);
+                } else if (!hasOR) {
+                    endGame(winner, `${loserName} stracił wszystkie Okręty rakietowe!`);
+                }
+            });
+        }
+
+        function placeMine(targetCoord) {
+            if (minesPlacedCount[myColor] >= 6) {
+                showToast('Wykorzystano już wszystkie 6 min!');
+                placingMineMode = false;
+                renderBoard();
+                updateUI();
+                return;
+            }
+            const snapshotBoard = pendingAction ? pendingAction.snapshotBoard : JSON.parse(JSON.stringify(board));
+            board[targetCoord] = {
+                id: `${myColor}_MN_${Math.random().toString(36).slice(2, 7)}`,
+                type: 'MN',
+                owner: myColor,
+                revealed: false,
+                neutralTurns: 0
+            };
+            minesPlacedCount[myColor]++;
+            placingMineMode = false;
+
+            if (pendingAction && pendingAction.type === 'move') {
+                pendingAction.minePlacedAfterMove = true;
+                pendingAction.eventMsg += ` Postawiono minę na ${targetCoord}.`;
+            } else {
+                pendingAction = {
+                    type: 'mine',
+                    from: selectedCell,
+                    to: targetCoord,
+                    snapshotBoard,
+                    eventMsg: `Postawiono minę na ${targetCoord}.`
+                };
+            }
+            renderBoard();
+            updateUI();
+        }
+
+        document.getElementById('btn-place-mine').addEventListener('click', () => {
+            if (phase !== 'battle' || currentTurn !== myColor || !selectedCell) return;
+            const u = board[selectedCell];
+            if (!u || u.type !== 'TR') return;
+            if (minesPlacedCount[myColor] >= 6) {
+                showToast('Wykorzystano już wszystkie 6 min!');
+                return;
+            }
+            placingMineMode = !placingMineMode;
+            renderBoard();
+            updateUI();
+        });
 
         document.getElementById('btn-confirm-turn').addEventListener('click', () => {
             if (!pendingAction) return;
