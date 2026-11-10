@@ -90,6 +90,26 @@
             box-shadow: inset 0 0 0 3px #38bdf8 !important;
         }
 
+        /* Delikatny ślad ostatniego ruchu */
+        .trail-yellow {
+            box-shadow: inset 0 0 0 1.5px rgba(250, 204, 21, 0.55);
+            background-color: rgba(250, 204, 21, 0.12);
+        }
+        .trail-red {
+            box-shadow: inset 0 0 0 1.5px rgba(248, 113, 113, 0.55);
+            background-color: rgba(248, 113, 113, 0.12);
+        }
+        .combat-marker {
+            position: absolute;
+            top: 1px;
+            right: 2px;
+            font-size: clamp(9px, 1.3vw, 14px);
+            line-height: 1;
+            pointer-events: none;
+            z-index: 5;
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+        }
+
         /* Pionki */
         .unit-token {
             width: 84%;
@@ -276,13 +296,14 @@
                 <h2 class="text-lg font-extrabold text-sky-400">Zasady Gry „Manewry Morskie”</h2>
                 <button onclick="closeModal('modal-rules')" class="text-slate-400 hover:text-white text-xl font-bold px-2">&times;</button>
             </div>
-            <div class="p-4 overflow-y-auto text-xs sm:text-sm text-slate-300 space-y-2 leading-relaxed">
-                <p><strong>1. Cel gry:</strong> Wprowadzić swój <em>Okręt desantowy</em> do portu przeciwnika (przez wejścia: <strong>Q3/O10</strong> dla Żółtych lub <strong>D3/B10</strong> dla Czerwonych). Utrata Okrętu desantowego lub wszystkich 3 Okrętów rakietowych oznacza przegraną.</p>
-                <p><strong>2. Ruch:</strong> Okręty poruszają się we wszystkich 8 kierunkach (również po skosie) o maksymalnie tyle pól, ile wynosi ich zasięg. Nie można przeskakiwać innych jednostek ani przekraczać białej linii brzegowej.</p>
-                <p><strong>3. Bicie:</strong> Atak następuje przez wejście na pole zajęte przez wroga. Jednostka silniejsza zostaje, słabsza ginie. Remis = obie giną.</p>
-                <p><strong>4. Baterie nabrzeżne:</strong> Blokują przejście wrogim okrętom w zasięgu 1 pola. Może je zniszczyć wyłącznie <em>Okręt rakietowy</em>.</p>
-                <p><strong>5. Miny:</strong> Stawia je tylko <em>Trałowiec</em> na sąsiednim polu (przycisk „Stawiam minę”). Minę może bezpiecznie zdjąć tylko wrogi Trałowiec; każdy inny okręt tonie razem z miną.</p>
-                <p><strong>6. Wody neutralne:</strong> Kropkowane pola wokół wyspy. Okręt może tam przebywać maks. 3 swoje tury (w 4. turze ulega internowaniu). Na wodach neutralnych nie można atakować ani stawiać min.</p>
+            <div class="p-4 overflow-y-auto text-xs sm:text-sm text-slate-300 space-y-2.5 leading-relaxed">
+                <p><strong>1. Cel gry:</strong> Wygrywa gracz, który wprowadzi swój <em>Okręt desantowy</em> do portu przeciwnika. Utrata Okrętu desantowego lub wszystkich trzech <em>Okrętów rakietowych</em> oznacza przegraną.</p>
+                <p><strong>2. Plansza i białe linie:</strong> Porty oznaczone są kolorami żółtym i czerwonym, a morze kolorem niebieskim. Białe linie oznaczają brzegi – żadna jednostka nie może ich przekroczyć (wyjątkiem jest atak Okrętu rakietowego na Baterię nabrzeżną).</p>
+                <p><strong>3. Poruszanie się:</strong> Okręty poruszają się we wszystkich 8 kierunkach (również po skosie) o maksymalnie tyle pól, ile wynosi ich zasięg. Aby zmylić przeciwnika, można ruszyć się o mniejszą liczbę pól. Zajętych pól nie wolno przeskakiwać.</p>
+                <p><strong>4. Bicie:</strong> Atak następuje przez wejście na pole zajęte przez jednostkę wroga. Obie jednostki zostają ujawnione – silniejsza zostaje na planszy, słabsza ginie. Przy równej sile giną obie.</p>
+                <p><strong>5. Baterie nabrzeżne:</strong> Blokują przejście wrogim okrętom w zasięgu 1 pola we wszystkich kierunkach. Baterię może zniszczyć wyłącznie <em>Okręt rakietowy</em>.</p>
+                <p><strong>6. Miny:</strong> Każdy gracz ma maksymalnie 6 min. Minę może postawić tylko <em>Trałowiec</em> na sąsiednim polu (przed lub po swoim ruchu). Minę może bezpiecznie zdjąć wyłącznie wrogi Trałowiec; każdy inny okręt tonie razem z miną.</p>
+                <p><strong>7. Wody neutralne:</strong> Kropkowane pola wokół wyspy na środku morza. Okręt może schronić się tam na maksymalnie 3 swoje tury – jeśli nie wypłynie w 4. turze, zostaje wyeliminowany. Na wodach neutralnych nie wolno atakować ani stawiać min.</p>
             </div>
         </div>
     </div>
@@ -451,6 +472,8 @@
         let turnNumber = 0;
         let roomCodeGlobal = null;
         let lastSyncId = 0;
+        let lastPaths = { yellow: [], red: [] };
+        let lastCombatMarker = null; // { coord, turnNumber }
 
         // ==========================================
         // 3. INICJALIZACJA POŁĄCZENIA (FIRESTORE)
@@ -552,6 +575,8 @@
                         if (typeof data.turnNumber === 'number') turnNumber = data.turnNumber;
                         if (data.lastEvent) lastEventText = data.lastEvent;
                         if (data.minesPlacedCount) minesPlacedCount = data.minesPlacedCount;
+                        if (data.lastPaths) lastPaths = data.lastPaths;
+                        lastCombatMarker = data.lastCombatMarker || null;
                         pendingAction = null;
                         selectedCell = null;
                         if (phase === 'setup') {
@@ -598,6 +623,8 @@
                         turnNumber = data.turnNumber || turnNumber;
                         lastEventText = data.lastEvent || lastEventText;
                         minesPlacedCount = data.minesPlacedCount || minesPlacedCount;
+                        if (data.lastPaths) lastPaths = data.lastPaths;
+                        lastCombatMarker = data.lastCombatMarker || null;
                         pendingAction = null;
                         selectedCell = null;
                         renderBoard();
@@ -632,6 +659,8 @@
                         lastEvent: payload.lastEvent,
                         minesPlacedCount: payload.minesPlacedCount,
                         turnNumber: payload.turnNumber,
+                        lastPaths: payload.lastPaths || { yellow: [], red: [] },
+                        lastCombatMarker: payload.lastCombatMarker || null,
                         force: !!payload.force,
                         syncId
                     });
@@ -904,6 +933,25 @@
             return { moves, attacks };
         }
 
+        function getPathCells(from, to) {
+            const f = getCellCoords(from);
+            const t = getCellCoords(to);
+            const dc = Math.sign(t.cIdx - f.cIdx);
+            const dr = Math.sign(t.rIdx - f.rIdx);
+            const path = [from];
+            let c = f.cIdx;
+            let r = f.rIdx;
+            let guard = 0;
+            while ((c !== t.cIdx || r !== t.rIdx) && guard < 10) {
+                c += dc;
+                r += dr;
+                const coord = coordsToName(c, r);
+                if (coord) path.push(coord);
+                guard++;
+            }
+            return path;
+        }
+
         function isInEnemyBatteryZone(coord, myOwner) {
             const { cIdx, rIdx } = getCellCoords(coord);
             for (let dc = -1; dc <= 1; dc++) {
@@ -975,9 +1023,19 @@
                     if (WALLS.has(`${coord}:T`)) cell.classList.add('wall-top');
                     if (WALLS.has(`${coord}:B`)) cell.classList.add('wall-bottom');
 
+                    if (lastPaths.yellow && lastPaths.yellow.includes(coord)) cell.classList.add('trail-yellow');
+                    if (lastPaths.red && lastPaths.red.includes(coord)) cell.classList.add('trail-red');
+
                     if (coord === selectedCell) cell.classList.add('highlight-selected');
                     if (validMoves.has(coord)) cell.classList.add('highlight-move');
                     if (validAttacks.has(coord)) cell.classList.add('highlight-attack');
+
+                    if (lastCombatMarker && lastCombatMarker.coord === coord && (turnNumber - lastCombatMarker.turnNumber) <= 1) {
+                        const marker = document.createElement('span');
+                        marker.className = 'combat-marker';
+                        marker.textContent = '💥';
+                        cell.appendChild(marker);
+                    }
                     if (validMines.has(coord)) cell.classList.add('highlight-mine');
                     if (pendingAction && (pendingAction.to === coord || pendingAction.from === coord)) {
                         cell.classList.add('highlight-pending');
@@ -1282,8 +1340,16 @@
             if (!pendingAction) return;
             if (pendingAction.type === 'attack') {
                 lastEventText = performAttack(pendingAction.from, pendingAction.to);
+                lastPaths[myColor] = getPathCells(pendingAction.from, pendingAction.to);
+                lastCombatMarker = { coord: pendingAction.to, turnNumber: turnNumber + 1 };
             } else {
                 lastEventText = pendingAction.eventMsg;
+                if (pendingAction.type === 'move') {
+                    lastPaths[myColor] = getPathCells(pendingAction.from, pendingAction.to);
+                }
+                if (lastCombatMarker && (turnNumber + 1 - lastCombatMarker.turnNumber) > 1) {
+                    lastCombatMarker = null;
+                }
             }
             updateAllNeutralTurnsForPlayer(myColor);
             pendingAction = null;
@@ -1300,7 +1366,9 @@
                 currentTurn,
                 lastEvent: lastEventText,
                 minesPlacedCount,
-                turnNumber
+                turnNumber,
+                lastPaths,
+                lastCombatMarker
             });
             renderBoard();
             updateUI();
@@ -1334,6 +1402,8 @@
                 phase,
                 lastEventText,
                 minesPlacedCount,
+                lastPaths,
+                lastCombatMarker,
                 savedAt: new Date().toISOString()
             };
             const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -1364,13 +1434,15 @@
                     phase = 'battle';
                     lastEventText = state.lastEventText || 'Wczytano zapisany stan gry.';
                     minesPlacedCount = state.minesPlacedCount || { yellow: 0, red: 0 };
+                    lastPaths = state.lastPaths || { yellow: [], red: [] };
+                    lastCombatMarker = state.lastCombatMarker || null;
                     myReady = true;
                     enemyReady = true;
                     pendingAction = null;
                     selectedCell = null;
 
                     document.getElementById('dock-overlay').classList.add('hidden');
-                    sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber, force: true });
+                    sendData({ type: 'SYNC_BOARD', board, currentTurn, lastEvent: lastEventText, minesPlacedCount, turnNumber, lastPaths, lastCombatMarker, force: true });
                     renderBoard();
                     updateUI();
                     showToast('Wczytano i zsynchronizowano stan gry!');
